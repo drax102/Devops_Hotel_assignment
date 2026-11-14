@@ -1,3 +1,4 @@
+import secrets
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
@@ -5,8 +6,9 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from app import models
-from app.database import SessionLocal
+from app.database import get_db
 from app.main import app
+from tests.conftest import TestingSessionLocal
 
 
 def test_concurrent_conflicting_reservations():
@@ -21,13 +23,24 @@ def test_concurrent_conflicting_reservations():
 
     Expected: Exactly 1 request succeeds with 201, 9 requests receive 409.
     """
-    db = SessionLocal()
-    # 1. Create a dedicated room for the concurrency test
-    import secrets
 
+    # Override get_db to yield independent test DB sessions per thread
+    def override_get_db():
+        session = TestingSessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    db = TestingSessionLocal()
+    # 1. Create a dedicated room for the concurrency test
     r_num = f"C{secrets.token_hex(3).upper()}"
     room = models.Room(
-        room_number=r_num, room_type="Concurrency Test Suite", price_per_night=300
+        room_number=r_num,
+        room_type="Concurrency Test Suite",
+        price_per_night=300,
     )
     db.add(room)
     db.commit()
@@ -40,7 +53,6 @@ def test_concurrent_conflicting_reservations():
     end_date = date.today() + timedelta(days=95)
 
     def attempt_booking(thread_idx: int):
-        # Each thread gets its own independent TestClient instance
         with TestClient(app) as local_client:
             payload = {
                 "customer_name": f"Concurrent User {thread_idx}",
@@ -75,7 +87,7 @@ def test_concurrent_conflicting_reservations():
     ), f"Expected {num_requests - 1} 409 Conflicts, but got {status_409_count}"
 
     # 4. Verify in DB directly: exactly 1 reservation exists for this room
-    verify_db = SessionLocal()
+    verify_db = TestingSessionLocal()
     try:
         confirmed_count = (
             verify_db.query(models.Reservation)
@@ -90,3 +102,4 @@ def test_concurrent_conflicting_reservations():
         ), f"Database has {confirmed_count} confirmed reservations instead of 1"
     finally:
         verify_db.close()
+        app.dependency_overrides.clear()

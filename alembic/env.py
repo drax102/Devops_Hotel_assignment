@@ -19,9 +19,13 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Use application's rendered DATABASE_URL
-db_url = DATABASE_URL.render_as_string(hide_password=False)
-config.set_main_option("sqlalchemy.url", db_url)
+# Use config's sqlalchemy.url if overridden (e.g. by test suite), else application DATABASE_URL
+url_from_config = config.get_main_option("sqlalchemy.url")
+if not url_from_config or "driver://user:pass@localhost/dbname" in url_from_config:
+    db_url = DATABASE_URL.render_as_string(hide_password=False)
+    config.set_main_option("sqlalchemy.url", db_url)
+else:
+    db_url = url_from_config
 
 
 def run_migrations_offline() -> None:
@@ -40,8 +44,9 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
+    url = config.get_main_option("sqlalchemy.url")
     connectable = create_engine(
-        db_url,
+        url,
         poolclass=pool.NullPool,
     )
 

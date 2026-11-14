@@ -110,7 +110,9 @@ def check_availability(
         .subquery()
     )
 
-    query = db.query(models.Room).filter(not_(models.Room.id.in_(overlapping_subquery)))
+    query = db.query(models.Room).filter(
+        not_(models.Room.id.in_(overlapping_subquery.select()))
+    )
 
     if room_type:
         query = query.filter(models.Room.room_type.ilike(room_type))

@@ -1,0 +1,11 @@
+﻿=== BASELINE SYSTEM AUDIT ===
+OS: Windows 11
+Python: 3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]
+FastAPI: 0.162.4
+SQLAlchemy: 2.1.8
+Psycopg: 3.3.8
+Pydantic: 2.14.3
+Alembic: 1.20.1
+Pytest: 9.2.0
+Black: 26.10.1
+Ruff: installed

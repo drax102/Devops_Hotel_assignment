@@ -1,0 +1,17 @@
+[tool.black]
+line-length = 88
+target-version = ['py313']
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "E501",  # Line length handled by black
+    "B008",  # FastAPI standard dependency and query injection pattern
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]

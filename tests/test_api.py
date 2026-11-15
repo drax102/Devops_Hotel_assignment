@@ -4,12 +4,30 @@ from fastapi import status
 
 
 def test_health_endpoint(client):
-    """Test health check returns 200 and healthy status."""
+    """Test health check returns 200 and healthy status (liveness)."""
     response = client.get("/health")
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert data["status"] == "healthy"
     assert data["service"] == "hotel-reservation-api"
+
+
+def test_ready_endpoint(client):
+    """Test ready check returns 200 when database is connected (readiness)."""
+    response = client.get("/ready")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["status"] == "ready"
+    assert data["database"] == "connected"
+
+
+def test_request_id_header_injected(client):
+    """Test that X-Request-ID is injected in response headers."""
+    response = client.get("/health")
+    assert "x-request-id" in response.headers
+    custom_id = "test-custom-tracing-id-12345"
+    response_with_custom = client.get("/health", headers={"X-Request-ID": custom_id})
+    assert response_with_custom.headers["x-request-id"] == custom_id
 
 
 def test_create_and_list_rooms(client):

@@ -1,19 +1,59 @@
 import secrets
+import time
+import uuid
 from datetime import date
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
-from sqlalchemy import not_
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from sqlalchemy import not_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
+from app.logging_config import setup_logging
+
+logger = setup_logging()
 
 app = FastAPI(
     title="Hotel Reservation Service",
     description="Room Availability and Reservation API",
     version="1.0.0",
 )
+
+
+@app.middleware("http")
+async def structured_logging_middleware(request: Request, call_next):
+    """Intercept HTTP requests to inject tracing IDs and output structured JSON logs."""
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    start_time = time.perf_counter()
+    try:
+        response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        response.headers["X-Request-ID"] = request_id
+        logger.info(
+            f"{request.method} {request.url.path} HTTP {response.status_code} ({duration_ms}ms)",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+        return response
+    except Exception as exc:
+        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        logger.error(
+            f"Unhandled failure handling {request.method} {request.url.path}: {exc}",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "duration_ms": duration_ms,
+                "error": str(exc),
+            },
+        )
+        raise
 
 
 def generate_unique_booking_reference(db: Session, prefix: str = "BK") -> str:
@@ -40,7 +80,29 @@ def home():
 
 @app.get("/health")
 def health_check():
+    """Liveness probe: verifies that the web service process is alive (no external dependency)."""
     return {"status": "healthy", "service": "hotel-reservation-api"}
+
+
+@app.get("/ready")
+def readiness_check(db: Session = Depends(get_db)):
+    """Readiness probe: verifies operational database connectivity via SELECT 1."""
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "connected"}
+    except Exception as exc:
+        logger.error(
+            "Readiness probe failed: database unreachable",
+            extra={"error": str(exc)},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "not_ready",
+                "database": "disconnected",
+                "error": str(exc),
+            },
+        ) from exc
 
 
 @app.post(

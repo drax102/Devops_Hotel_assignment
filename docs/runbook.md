@@ -209,7 +209,7 @@ docker compose up -d app
 # Verify immediate recovery
 curl.exe -k -i https://localhost/health
 ```
-Rollback executes as a fast rollback with a brief interruption (container recreation takes ~2-3 seconds).
+Rollback executes as a fast rollback with a brief interruption (container recreation takes a few seconds).
 
 ### Automated Rollback Drill
 Run the verified rollback drill to validate fast rollback with a brief interruption:

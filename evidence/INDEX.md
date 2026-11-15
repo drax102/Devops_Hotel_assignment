@@ -21,7 +21,7 @@ This document indexes all verification outputs, test runs, CI logs, and operatio
 ---
 
 ## Important Scope Note on Releases & Rollback
-GHCR image `v1.0.0` was built from commit `012b738` (before `/ready`, JSON logging, and Nginx were introduced); the rollback drill used locally built tags (`hotel-reservation-api:v1.0.0` and `v1.0.1`). Release `v1.1.0` contains the complete production stack including `/ready`, JSON logging, and Nginx integration.
+GHCR image `v1.0.0` was built from commit `012b738` (before `/ready`, JSON logging, and Nginx were introduced); the rollback drill used locally built tags (`hotel-reservation-api:v1.0.0` and `v1.0.1`). Release `v1.1.0` (commit `ffc4ffd7d5b6222a0d0b6bfd80dc1561f4546f5a`) contains the application updates (`/ready` and JSON logging). Nginx is not part of the application image; it runs as a separate service container using stock `nginx:alpine` with a mounted configuration.
 
 ---
 

@@ -234,7 +234,7 @@ The GitHub Actions CI pipeline runs on every push and pull request to `main`:
 
 ### Real GHCR Published Releases
 - **Repository**: `ghcr.io/drax102/devops_hotel_assignment`
-- **Release Tag v1.1.0 (Full Production Stack with Ingress & Observability)**: [Workflow Run 43757515988](https://github.com/drax102/Devops_Hotel_assignment/actions/runs/43757515988)
+- **Release Tag v1.1.0 (Application Image with /ready & JSON Logging)**: [Workflow Run 43757515988](https://github.com/drax102/Devops_Hotel_assignment/actions/runs/43757515988)
   - Index Digest: `sha256:c04f01272af8741827b6e4d13109ac9dc0f52db2e5d86d6807f072ac5354bac8`
   - Linux AMD64 Manifest: `sha256:da8cdab147170c264d06a41e1cd5cb0119af66c5b400207a3965c0f25193ddfc`
   - Evidence: [`evidence/14_image_digest_v1.1.0.txt`](file:///evidence/14_image_digest_v1.1.0.txt)
@@ -244,7 +244,7 @@ The GitHub Actions CI pipeline runs on every push and pull request to `main`:
   - Evidence: [`evidence/07_image_digest.txt`](file:///evidence/07_image_digest.txt)
 
 > [!IMPORTANT]
-> GHCR image `v1.0.0` was built from commit `012b738` (before `/ready`, JSON logging, and Nginx were introduced); the rollback drill used locally built tags (`hotel-reservation-api:v1.0.0` and `v1.0.1`). Release `v1.1.0` contains the complete production stack including `/ready`, JSON logging, and Nginx integration.
+> GHCR image `v1.0.0` was built from commit `012b738` (before `/ready`, JSON logging, and Nginx were introduced); the rollback drill used locally built tags (`hotel-reservation-api:v1.0.0` and `v1.0.1`). Release `v1.1.0` (commit `ffc4ffd7d5b6222a0d0b6bfd80dc1561f4546f5a`) contains the application updates (`/ready` and JSON logging). Nginx is not part of the application image; it runs as a separate service container using stock `nginx:alpine` with a mounted configuration.
 
 ---
 
@@ -274,7 +274,7 @@ The GitHub Actions CI pipeline runs on every push and pull request to `main`:
   ```powershell
   $env:APP_VERSION = "v1.0.0"; docker compose up -d app
   ```
-  Rollback executes as a fast rollback with a brief interruption (container recreation takes ~2-3 seconds).
+  Rollback executes as a fast rollback with a brief interruption (container recreation takes a few seconds).
 - **Automated Verification**:
   ```powershell
   powershell -ExecutionPolicy Bypass -File scripts/rollback_drill.ps1

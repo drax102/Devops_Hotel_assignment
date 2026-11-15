@@ -1,4 +1,4 @@
-﻿=== BASELINE SYSTEM AUDIT ===
+=== BASELINE SYSTEM AUDIT ===
 OS: Windows 11
 Python: 3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]
 FastAPI: 0.162.4

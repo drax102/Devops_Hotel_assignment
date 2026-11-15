@@ -15,7 +15,7 @@ on:
 jobs:
   lint-and-test:
     name: Lint, Test & Concurrency Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     services:
       postgres:
@@ -72,7 +72,7 @@ jobs:
 
   docker-build:
     name: Build & Tag Container Image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: lint-and-test
     permissions:
       contents: read
@@ -90,8 +90,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            hotel-reservation-api
-            ghcr.io/${{ github.repository }}
+            ghcr.io/drax102/devops_hotel_assignment
           tags: |
             type=sha,format=long,prefix=sha-
             type=sha,format=short,prefix=sha-
@@ -107,6 +106,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Package Container Image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -118,4 +118,10 @@ jobs:
       - name: Verify Built Local Container Image
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         run: |
-          docker images hotel-reservation-api
+          docker images ghcr.io/drax102/devops_hotel_assignment
+
+      - name: Record Image Digest
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "IMAGE_DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
+          echo "Pushed Image Digest: ${{ steps.build.outputs.digest }}"

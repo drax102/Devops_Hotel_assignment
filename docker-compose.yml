@@ -22,7 +22,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: hotel-reservation-api:local
+    image: hotel-reservation-api:${APP_VERSION:-local}
     container_name: hotel-app
     restart: unless-stopped
     ports:

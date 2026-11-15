@@ -1,7 +1,7 @@
 ============================================================
 ACCEPTANCE TEST 2: CLEAN-CLONE ENVIRONMENT & BOOKING DRILL
 ============================================================
-Execution Timestamp: 2026-11-16T01:47:22.678Z
+Execution Timestamp: 2026-11-16T01:59:46.878Z
 
 === 1. STOPPING MAIN STACK ===
 === 2. PREPARING ISOLATED CLONE DIRECTORY ===
@@ -21,18 +21,18 @@ App container health status: "healthy"
 === 5. VERIFYING SERVICE STATUS ===
 NAME             IMAGE                         COMMAND                  SERVICE   CREATED          STATUS                    PORTS
 hotel-app        hotel-reservation-api:local   "sh -c 'alembic upgrΓÇª"   app       26 seconds ago   Up 13 seconds (healthy)   127.0.0.1:8000->8000/tcp
-hotel-nginx      nginx:alpine                  "/docker-entrypoint.ΓÇª"   nginx     26 seconds ago   Up 3 seconds              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+hotel-nginx      nginx:alpine                  "/docker-entrypoint.ΓÇª"   nginx     25 seconds ago   Up 3 seconds              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
 hotel-postgres   postgres:17-alpine            "docker-entrypoint.sΓÇª"   db        26 seconds ago   Up 24 seconds (healthy)   127.0.0.1:5432->5432/tcp
 
 === 6. PROBING HEALTH & READINESS ENDPOINTS OVER HTTPS ===
 Testing /health (Liveness):
 HTTP/1.1 200 OK
 Server: nginx/1.31.8
-Date: Sun, 15 Nov 2026 20:17:59 GMT
+Date: Sun, 15 Nov 2026 20:30:23 GMT
 Content-Type: application/json
 Content-Length: 54
 Connection: keep-alive
-x-request-id: 99a42342-0359-4db9-a998-501ba985b418
+x-request-id: 702d8e33-535f-4b80-8230-6194ea894bf4
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 X-XSS-Protection: 1; mode=block
@@ -43,11 +43,11 @@ Referrer-Policy: no-referrer-when-downgrade
 Testing /ready (Readiness):
 HTTP/1.1 200 OK
 Server: nginx/1.31.8
-Date: Sun, 15 Nov 2026 20:17:59 GMT
+Date: Sun, 15 Nov 2026 20:30:23 GMT
 Content-Type: application/json
 Content-Length: 41
 Connection: keep-alive
-x-request-id: a76c7356-c15a-4394-89aa-9b29e725fbaa
+x-request-id: 63bb8c7d-facc-498d-a0b5-b53e40b7a004
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 X-XSS-Protection: 1; mode=block
@@ -69,27 +69,27 @@ Selected Dates: Check-in=2026-12-06, Check-out=2026-12-11
 Submitting initial reservation (Expect HTTP 201 Created):
 HTTP/1.1 201 Created
 Server: nginx/1.31.8
-Date: Sun, 15 Nov 2026 20:18:02 GMT
+Date: Sun, 15 Nov 2026 20:30:26 GMT
 Content-Type: application/json
 Content-Length: 160
 Connection: keep-alive
-x-request-id: e6581950-770e-4ca5-bc23-5408d01ae3fa
+x-request-id: b00b16af-a2c4-48e8-aa6b-d1dd50003ffa
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 X-XSS-Protection: 1; mode=block
 Strict-Transport-Security: max-age=31536000; includeSubDomains
 Referrer-Policy: no-referrer-when-downgrade
 
-{"id":2,"booking_reference":"BK-DBFDBE15","customer_name":"Clean Clone Guest","room_id":1,"check_in":"2026-12-06","check_out":"2026-12-11","status":"confirmed"}
+{"id":2,"booking_reference":"BK-91C086B5","customer_name":"Clean Clone Guest","room_id":1,"check_in":"2026-12-06","check_out":"2026-12-11","status":"confirmed"}
 === 9. SUBMITTING CONFLICTING RESERVATION OVER HTTPS ===
 Submitting identical dates on Room 1 (Expect HTTP 409 Conflict):
 HTTP/1.1 409 Conflict
 Server: nginx/1.31.8
-Date: Sun, 15 Nov 2026 20:18:02 GMT
+Date: Sun, 15 Nov 2026 20:30:26 GMT
 Content-Type: application/json
 Content-Length: 59
 Connection: keep-alive
-x-request-id: 570d95fc-b9b8-41e6-8f55-635f9fc4e578
+x-request-id: 1121d1fe-aed7-493e-bcd1-a00dea713f81
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 X-XSS-Protection: 1; mode=block

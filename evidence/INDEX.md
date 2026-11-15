@@ -9,13 +9,19 @@ This document indexes all verification outputs, test runs, CI logs, and operatio
 | Step / Requirement | Evidence File | Command Executed | Status |
 | :--- | :--- | :--- | :--- |
 | **1. Baseline & Concurrency Protection** | [`evidence/04_pytest_full.txt`](file:///evidence/04_pytest_full.txt) | `pytest -v -s` (10 concurrent requests: 1x 201 Created, 9x 409 Conflict) | **VERIFIED** |
-| **2. Clean-Clone Environment & Start** | [`evidence/12_clean_clone.txt`](file:///evidence/12_clean_clone.txt) | Clean clone into new folder, README steps, dynamic booking (201) & duplicate (409) | **VERIFIED** |
+| **2. Clean-Clone Environment & Start** | [`evidence/13_clean_clone.txt`](file:///evidence/13_clean_clone.txt) | Clean clone into new folder, README steps, dynamic booking (201) & duplicate (409) | **VERIFIED** |
 | **3. CI Pipeline Run** | [`evidence/06_ci_pipeline.txt`](file:///evidence/06_ci_pipeline.txt) | GitHub API extraction of runs `43716465249` (PR) & `43716727141` (main) | **VERIFIED** |
-| **4. Versioned Image Produced** | [`evidence/07_image_digest.txt`](file:///evidence/07_image_digest.txt)<br>[`evidence/13_image_digest_v1.1.0.txt`](file:///evidence/13_image_digest_v1.1.0.txt) | Release tag `v1.0.0` (run `43717288264`) & `v1.1.0` (run `43757515988`), `imagetools inspect`, digest pull | **VERIFIED** |
+| **4. Versioned Image Produced** | [`evidence/07_image_digest.txt`](file:///evidence/07_image_digest.txt)<br>[`evidence/14_image_digest_v1.1.0.txt`](file:///evidence/14_image_digest_v1.1.0.txt) | Release tag `v1.0.0` (run `43717288264`) & `v1.1.0` (run `43757515988`), `imagetools inspect`, digest pull | **VERIFIED** |
 | **5. Health Checks & JSON Logs** | [`evidence/08_observability_failure_drill.txt`](file:///evidence/08_observability_failure_drill.txt) | Decoupled `/health` & `/ready`, structured JSON logs with `x-request-id` | **VERIFIED** |
 | **6. Failure Detection & Recovery** | [`evidence/08_observability_failure_drill.txt`](file:///evidence/08_observability_failure_drill.txt) | DB stopped: `/ready` returns 503, error logged. DB started: self-heals to 200 | **VERIFIED** |
 | **7. Backup, Restore & Rollback** | [`evidence/09_backup_restore.txt`](file:///evidence/09_backup_restore.txt)<br>[`evidence/10_rollback_drill.txt`](file:///evidence/10_rollback_drill.txt) | `backup.ps1` (-Fc), table truncate, `restore.ps1`, volume persistence.<br>Fast rollback with a brief interruption from buggy v1.0.1 to v1.0.0 | **VERIFIED** |
 | **Ingress & TLS Verification** | [`evidence/11_nginx_https.txt`](file:///evidence/11_nginx_https.txt) | Port 80->443 redirect, TLS termination, security headers, HTTPS booking & 409 | **VERIFIED** |
+| **Port Isolation Verification** | [`evidence/12_port_isolation.txt`](file:///evidence/12_port_isolation.txt) | Default stack publishes only 80 and 443; ports 8000 and 5432 closed to host | **VERIFIED** |
+
+---
+
+## Important Scope Note on Releases & Rollback
+GHCR image `v1.0.0` was built from commit `012b738` (before `/ready`, JSON logging, and Nginx were introduced); the rollback drill used locally built tags (`hotel-reservation-api:v1.0.0` and `v1.0.1`). Release `v1.1.0` contains the complete production stack including `/ready`, JSON logging, and Nginx integration.
 
 ---
 
@@ -39,7 +45,7 @@ This document indexes all verification outputs, test runs, CI logs, and operatio
 - Verified health, rooms, reservations, availability, boundary edge cases, and 10 concurrent requests resulting in exactly one HTTP 201 Created and nine HTTP 409 Conflict responses.
 
 ### 5. `evidence/05_docker_build_compose.txt`
-- Multi-stage Docker build producing a lean 322MB image running as non-root `appuser:10001`.
+- Docker build producing a lean 322MB image running as non-root `appuser:10001`.
 - Clean Compose startup on bridge network `hotel_internal`.
 - Live container health check verification (`/health` returning 200 OK).
 
@@ -84,20 +90,26 @@ This document indexes all verification outputs, test runs, CI logs, and operatio
 - Verifies HTTPS port 443 returns `200 OK` on `/health` and `/ready` with security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`, `Referrer-Policy`).
 - Verifies successful room booking over HTTPS (`201 Created`) and subsequent double-booking rejection (`409 Conflict`).
 
-### 12. `evidence/12_clean_clone.txt`
+### 12. `evidence/12_port_isolation.txt`
+- Verification of port isolation executed by `scripts/verify_port_isolation.ps1`.
+- Confirms `docker compose config | Select-String "published"` yields only port 80 and port 443.
+- Confirms `curl.exe -k https://localhost/health` succeeds with `200 OK`.
+- Confirms direct access to container port `http://localhost:8000/health` fails with connection refused (Exit Code 7).
+- Confirms direct access to PostgreSQL port `127.0.0.1:5432` fails with connection closed (`TcpTestSucceeded: False`).
+
+### 13. `evidence/13_clean_clone.txt`
 - Clean-clone environment and startup verification executed by `scripts/verify_clean_clone.ps1`.
 - Cloned repository into fresh isolated directory (`D:\temp_clean_clone_verify`).
 - Followed ONLY the documented README commands: `.env.example` -> `.env`, `generate_certs.ps1`, `docker compose up -d`.
 - Verified `/health` and `/ready` return 200 OK over HTTPS.
 - Executed `scripts/seed.py` successfully.
-- Submitted HTTPS reservation using dynamic dates relative to today (`Check-in: today+20 days, Check-out: today+25 days`), returning `201 Created` with booking reference `BK-DBFDBE15`.
+- Submitted HTTPS reservation using dynamic dates relative to today (`Check-in: today+20 days, Check-out: today+25 days`), returning `201 Created` with booking reference `BK-91C086B5`.
 - Submitted conflicting reservation for identical room and dates, returning `409 Conflict` (`Room is already booked for the requested dates`).
 - Verified complete teardown and clean restart of the primary stack.
 
-### 13. `evidence/13_image_digest_v1.1.0.txt`
+### 14. `evidence/14_image_digest_v1.1.0.txt`
 - Release tag `v1.1.0` triggering GitHub Actions workflow run `43757515988`.
 - Remote GHCR registry inspection via `docker buildx imagetools inspect ghcr.io/drax102/devops_hotel_assignment:1.1.0`.
 - Verified OCI Image Index Digest: `sha256:c04f01272af8741827b6e4d13109ac9dc0f52db2e5d86d6807f072ac5354bac8`.
 - Verified Linux AMD64 Manifest Digest: `sha256:da8cdab147170c264d06a41e1cd5cb0119af66c5b400207a3965c0f25193ddfc`.
 - Pull by tag `1.1.0` locally and runtime execution test verifying 200 OK response on port 8003.
-

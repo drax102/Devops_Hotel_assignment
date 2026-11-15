@@ -4,7 +4,7 @@
 
 A containerized Room Availability and Reservation Service built for the **ALGIONS AI LABS DevOps & Cloud Engineering** assessment.
 
-This project delivers high concurrency resilience, automated continuous integration, container security, TLS-encrypted ingress with Nginx, structured observability, and fast disaster recovery.
+This project delivers high concurrency resilience, automated continuous integration, strict container security, TLS-encrypted ingress with Nginx, structured observability, and fast disaster recovery.
 
 ---
 
@@ -16,11 +16,14 @@ The system runs as an isolated multi-container architecture orchestrated via Doc
 flowchart TD
     Client(["Client / Host Browser / cURL"])
 
-    subgraph HostPorts ["Host Published Ports"]
+    subgraph HostPorts ["Host Published Ports (Default Stack)"]
         P80["Port 80 (HTTP)"]
         P443["Port 443 (HTTPS)"]
-        P8000["127.0.0.1:8000 (Dev Override)"]
-        P5432["127.0.0.1:5432 (Dev Override)"]
+    end
+
+    subgraph DevPorts ["Dev Override Ports (docker-compose.dev.yml)"]
+        P8000["127.0.0.1:8000 (Local App Testing)"]
+        P5432["127.0.0.1:5432 (Local DB / Pytest)"]
     end
 
     subgraph DockerBridge ["Docker Private Network: hotel_internal"]
@@ -55,8 +58,8 @@ flowchart TD
     P443 --> TLS
     TLS --> SecHeaders
     SecHeaders -->|Reverse Proxy: http://app:8000| AppUser
-    P8000 -.->|Direct Dev Access| AppUser
-    P5432 -.->|Direct Host Migrations| PGCore
+    P8000 -.->|Dev Compose Only| AppUser
+    P5432 -.->|Dev Compose Only| PGCore
     AppUser --> Middle
     Middle --> Routes
     Middle --> Liveness
@@ -127,7 +130,7 @@ Copy-Item .env.example .env
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/generate_certs.ps1
 ```
-Generates a self-signed TLS certificate (`certs/selfsigned.crt` and `certs/selfsigned.key`) valid for `localhost` and `127.0.0.1`.
+Generates a local TLS certificate (`certs/selfsigned.crt` and `certs/selfsigned.key`) valid for `localhost` and `127.0.0.1`.
 
 ### 3. Start Service Stack
 ```powershell
@@ -184,19 +187,25 @@ $body | curl.exe -s -k -i -X POST https://localhost/reservations -H "Content-Typ
 
 ---
 
-## Port Map & Compose Configuration
+## Port Map & Network Isolation
 
-When running default `docker compose up -d`, Docker Compose automatically merges `docker-compose.yml` and `docker-compose.override.yml`. The active port bindings produced by `docker compose config` are:
+By default, executing `docker compose up -d` uses strictly `docker-compose.yml`, which isolates application and database ports from the host network.
 
-| Service | Container Port | Published Host Port | Interface Binding | Purpose | Source File |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `hotel-nginx` | `80/tcp` | `80` | `0.0.0.0` (all interfaces) | HTTP redirect (301 -> HTTPS) | `docker-compose.yml` |
-| `hotel-nginx` | `443/tcp` | `443` | `0.0.0.0` (all interfaces) | HTTPS reverse proxy & TLS | `docker-compose.yml` |
-| `hotel-app` | `8000/tcp` | `8000` | `127.0.0.1` (localhost only) | FastAPI direct access for local dev/testing | `docker-compose.override.yml` |
-| `hotel-postgres` | `5432/tcp` | `5432` | `127.0.0.1` (localhost only) | PostgreSQL host access for migrations/tests | `docker-compose.override.yml` |
+### Default Production Port Mappings (`docker compose up -d`)
 
-> [!NOTE]
-> `docker-compose.override.yml` is used for local developer ergonomics. In a production environment where the override file is omitted (`docker compose -f docker-compose.yml up -d`), `hotel-app` and `hotel-postgres` publish zero ports to the host and communicate exclusively over the private bridge network `hotel_internal`.
+| Service | Container Port | Published Host Port | Interface Binding | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| `hotel-nginx` | `80/tcp` | `80` | `0.0.0.0` (all interfaces) | HTTP redirect (301 -> HTTPS) |
+| `hotel-nginx` | `443/tcp` | `443` | `0.0.0.0` (all interfaces) | HTTPS reverse proxy & TLS |
+| `hotel-app` | `8000/tcp` | None | Internal bridge only | Isolated upstream application |
+| `hotel-postgres` | `5432/tcp` | None | Internal bridge only | Isolated storage engine |
+
+### Development Profile (`docker-compose.dev.yml`)
+To bind PostgreSQL port 5432 to `127.0.0.1` for host-level pytest execution and database tools:
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db
+```
+This maps `127.0.0.1:5432:5432` and `127.0.0.1:8000:8000` strictly to loopback.
 
 ---
 
@@ -221,21 +230,21 @@ When running default `docker compose up -d`, Docker Compose automatically merges
 The GitHub Actions CI pipeline runs on every push and pull request to `main`:
 - **Linting & Code Quality**: `ruff check .` and `black --check .`
 - **Database Migrations & Test Suite**: PostgreSQL 17 service container, `alembic upgrade head`, and `pytest -v -s` with passing tests including 10-thread parallel race-condition verification.
-- **Docker Build & Push**: On release tags (`v*`), builds multi-platform image and pushes versioned image to GitHub Container Registry (GHCR).
+- **Docker Build & Push**: On release tags (`v*`), builds Linux/AMD64 image and pushes versioned image to GitHub Container Registry (GHCR).
 
 ### Real GHCR Published Releases
 - **Repository**: `ghcr.io/drax102/devops_hotel_assignment`
 - **Release Tag v1.1.0 (Full Production Stack with Ingress & Observability)**: [Workflow Run 43757515988](https://github.com/drax102/Devops_Hotel_assignment/actions/runs/43757515988)
   - Index Digest: `sha256:c04f01272af8741827b6e4d13109ac9dc0f52db2e5d86d6807f072ac5354bac8`
   - Linux AMD64 Manifest: `sha256:da8cdab147170c264d06a41e1cd5cb0119af66c5b400207a3965c0f25193ddfc`
-  - Evidence: [`evidence/13_image_digest_v1.1.0.txt`](file:///evidence/13_image_digest_v1.1.0.txt)
+  - Evidence: [`evidence/14_image_digest_v1.1.0.txt`](file:///evidence/14_image_digest_v1.1.0.txt)
 - **Release Tag v1.0.0**: [Workflow Run 43717288264](https://github.com/drax102/Devops_Hotel_assignment/actions/runs/43717288264)
   - Index Digest: `sha256:9fc1f38d9fdd9beaf19a310253f2d9ff50c2277369791fe4acff293f6fe38f14`
   - Linux AMD64 Manifest: `sha256:0040a3901bc53a6194d1561134bd5f4cd881efed3b9dacb8fd7a9fd70c28603c`
   - Evidence: [`evidence/07_image_digest.txt`](file:///evidence/07_image_digest.txt)
 
 > [!IMPORTANT]
-> GHCR image `v1.0.0` was built from commit `012b738`, before `/ready`, JSON logging, and Nginx were introduced; the rollback drill used locally built tags (`hotel-reservation-api:v1.0.0` and `v1.0.1`). Release `v1.1.0` contains the complete production stack including `/ready`, JSON logging, and Nginx integration.
+> GHCR image `v1.0.0` was built from commit `012b738` (before `/ready`, JSON logging, and Nginx were introduced); the rollback drill used locally built tags (`hotel-reservation-api:v1.0.0` and `v1.0.1`). Release `v1.1.0` contains the complete production stack including `/ready`, JSON logging, and Nginx integration.
 
 ---
 
@@ -287,15 +296,16 @@ All evidence files contain raw, unedited terminal outputs captured on the system
 | **02** | [`evidence/02_alembic_migration.txt`](file:///evidence/02_alembic_migration.txt) | Migration execution & PostgreSQL GiST exclusion constraint inspection |
 | **03** | [`evidence/03_seed_verification.txt`](file:///evidence/03_seed_verification.txt) | Idempotent seeder verification (run twice consecutively, 0 duplicates) |
 | **04** | [`evidence/04_pytest_full.txt`](file:///evidence/04_pytest_full.txt) | Full test suite passing (10 concurrent requests: 1x 201 Created, 9x 409 Conflict) |
-| **05** | [`evidence/05_docker_build_compose.txt`](file:///evidence/05_docker_build_compose.txt) | Multi-stage Docker build (322MB, non-root user), Compose startup, healthcheck |
+| **05** | [`evidence/05_docker_build_compose.txt`](file:///evidence/05_docker_build_compose.txt) | Docker build (322MB, non-root user), Compose startup, healthcheck |
 | **06** | [`evidence/06_ci_pipeline.txt`](file:///evidence/06_ci_pipeline.txt) | GitHub Actions API extraction for PR & main green runs |
 | **07** | [`evidence/07_image_digest.txt`](file:///evidence/07_image_digest.txt) | `v1.0.0` GHCR build, remote digest inspection, pull by digest & test |
 | **08** | [`evidence/08_observability_failure_drill.txt`](file:///evidence/08_observability_failure_drill.txt) | Outage drill: DB failure detected, readiness 503, JSON logs, self-healing |
 | **09** | [`evidence/09_backup_restore.txt`](file:///evidence/09_backup_restore.txt) | Database backup, data wipe, full restoration, and volume persistence drill |
 | **10** | [`evidence/10_rollback_drill.txt`](file:///evidence/10_rollback_drill.txt) | Deployment regression drill: fast rollback with a brief interruption to v1.0.0 |
 | **11** | [`evidence/11_nginx_https.txt`](file:///evidence/11_nginx_https.txt) | Nginx TLS termination, port 80 redirect, security headers, HTTPS booking |
-| **12** | [`evidence/12_clean_clone.txt`](file:///evidence/12_clean_clone.txt) | Clean clone into new folder, README steps, dynamic booking (201) & duplicate (409) |
-| **13** | [`evidence/13_image_digest_v1.1.0.txt`](file:///evidence/13_image_digest_v1.1.0.txt) | `v1.1.0` GHCR build, remote digest inspection, pull by tag 1.1.0 & runtime test |
+| **12** | [`evidence/12_port_isolation.txt`](file:///evidence/12_port_isolation.txt) | Port isolation check: default stack publishes only 80 and 443 |
+| **13** | [`evidence/13_clean_clone.txt`](file:///evidence/13_clean_clone.txt) | Clean clone into new folder, README steps, dynamic booking (201) & duplicate (409) |
+| **14** | [`evidence/14_image_digest_v1.1.0.txt`](file:///evidence/14_image_digest_v1.1.0.txt) | `v1.1.0` GHCR build, remote digest inspection, pull by tag 1.1.0 & runtime test |
 
 See [`evidence/INDEX.md`](file:///evidence/INDEX.md) for full descriptions.
 

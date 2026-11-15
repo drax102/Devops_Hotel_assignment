@@ -85,10 +85,10 @@ The service decouples process liveness from database readiness:
 ### Liveness Probe (`/health`)
 Probes whether the application process and ASGI event loop are responsive.
 ```powershell
-# Via Nginx HTTPS
+# Via Nginx HTTPS (default stack)
 curl.exe -k -i https://localhost/health
 
-# Direct to container (via dev port)
+# Direct to container (when started with docker-compose.dev.yml)
 curl.exe -i http://localhost:8000/health
 ```
 - **Expected Status**: `HTTP/1.1 200 OK`

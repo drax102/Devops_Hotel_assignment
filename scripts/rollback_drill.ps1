@@ -10,17 +10,17 @@ function Wait-For-HttpResponse {
     param([string]$Url, [int]$TimeoutSeconds = 15)
     $startTime = [System.Diagnostics.Stopwatch]::StartNew()
     while ($startTime.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
-        $output = curl.exe -s -i $Url
-        if ($output -and ($output | Select-String -Pattern "HTTP/1\.1")) {
+        $output = curl.exe -s -k -i $Url
+        if ($output -and ($output | Select-String -Pattern "HTTP/1\.[01]")) {
             return ($output -join "`n")
         }
         Start-Sleep -Milliseconds 500
     }
-    return (curl.exe -s -i $Url -join "`n")
+    return (curl.exe -s -k -i $Url -join "`n")
 }
 
 Write-Output "============================================================"
-Write-Output "BLOCK 5: VERSIONED RELEASE & INSTANT ROLLBACK DRILL"
+Write-Output "BLOCK 5: VERSIONED RELEASE & FAST ROLLBACK DRILL"
 Write-Output "============================================================"
 
 # Stage 1: Build & Deploy Stable Baseline v1.0.0
@@ -32,7 +32,7 @@ $env:APP_VERSION = "v1.0.0"
 Write-Output "[$(Get-UtcTimestamp)] Deploying stable v1.0.0 via Compose (APP_VERSION=v1.0.0)..."
 docker compose up -d app | Out-Null
 
-$v100Res = Wait-For-HttpResponse "http://localhost:8000/health"
+$v100Res = Wait-For-HttpResponse "https://localhost/health"
 Write-Output "[$(Get-UtcTimestamp)] Probing stable v1.0.0 /health:"
 Write-Output $v100Res
 
@@ -62,7 +62,7 @@ $env:APP_VERSION = "v1.0.1"
 Write-Output "[$(Get-UtcTimestamp)] Deploying buggy v1.0.1 via Compose (APP_VERSION=v1.0.1)..."
 docker compose up -d app | Out-Null
 
-$buggyRes = Wait-For-HttpResponse "http://localhost:8000/health"
+$buggyRes = Wait-For-HttpResponse "https://localhost/health"
 Write-Output "[$(Get-UtcTimestamp)] Probing v1.0.1 /health (DETECTING CRITICAL OUTAGE):"
 Write-Output $buggyRes
 
@@ -72,7 +72,7 @@ Write-Output "[$(Get-UtcTimestamp)] Rolling back Compose to stable image tag (AP
 $env:APP_VERSION = "v1.0.0"
 docker compose up -d app | Out-Null
 
-$rollbackRes = Wait-For-HttpResponse "http://localhost:8000/health"
+$rollbackRes = Wait-For-HttpResponse "https://localhost/health"
 Write-Output "[$(Get-UtcTimestamp)] Probing /health post-rollback (VERIFYING RECOVERY):"
 Write-Output $rollbackRes
 

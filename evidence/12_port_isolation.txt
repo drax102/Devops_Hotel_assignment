@@ -1,0 +1,34 @@
+============================================================
+EVIDENCE 12: PORT ISOLATION VERIFICATION
+============================================================
+Verification Timestamp: 2026-11-16T01:59:07.453Z
+
+=== 1. DOCKER COMPOSE CONFIG PUBLISHED PORTS ===
+
+        published: "80"
+        published: "443"
+
+=== 2. PROBING HTTPS PORT 443 (EXPECT 200 OK) ===
+HTTP/1.1 200 OK
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:29:07 GMT
+Content-Type: application/json
+Content-Length: 54
+Connection: keep-alive
+x-request-id: 68ab5dd1-e851-4a87-b98c-cf991509d79b
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: no-referrer-when-downgrade
+
+{"status":"healthy","service":"hotel-reservation-api"}
+=== 3. PROBING DIRECT APP PORT 8000 (EXPECT CONNECTION REFUSED / FAIL) ===
+Exit Code: 7 (non-zero indicates connection failure as expected)
+
+=== 4. PROBING DIRECT POSTGRES PORT 5432 (EXPECT CONNECTION REFUSED / CLOSED) ===
+Port 5432 TcpTestSucceeded: False (False = properly isolated)
+
+=== PORT ISOLATION VERIFICATION COMPLETE ===
+
+

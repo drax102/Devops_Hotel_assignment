@@ -82,7 +82,7 @@ Status 409 Conflict:   9
 **Satisfies Acceptance Test 3 (CI runs checks, tests, build) & Acceptance Test 4 (Versioned image produced)**
 
 ### Voiceover
-> *"Next, we demonstrate our automated CI/CD pipeline and container registry integration. Every pull request and push to main runs our GitHub Actions pipeline on Ubuntu 24.04 with Ruff, Black, PostgreSQL 17 migrations, and our full test suite. When a release tag is pushed, a multi-platform image is versioned and published to GitHub Container Registry."*
+> *"Next, we demonstrate our automated CI/CD pipeline and container registry integration. Every pull request and push to main runs our GitHub Actions pipeline on Ubuntu 24.04 with Ruff, Black, PostgreSQL 17 migrations, and our full test suite. When a release tag is pushed, a versioned image is published to GitHub Container Registry."*
 
 ### Actions & Commands
 Switch to browser or display in terminal:

@@ -13,9 +13,9 @@ Write-Output "DRILL START: $(Get-UtcTimestamp)"
 
 Write-Output "`n=== STAGE 1: HEALTHY BASELINE (PRE-OUTAGE) ==="
 Write-Output "[$(Get-UtcTimestamp)] Checking /health (Liveness):"
-curl.exe -s -i http://localhost:8000/health
+curl.exe -s -k -i https://localhost/health
 Write-Output "[$(Get-UtcTimestamp)] Checking /ready (Readiness):"
-curl.exe -s -i http://localhost:8000/ready
+curl.exe -s -k -i https://localhost/ready
 
 Write-Output "`n=== STAGE 2: SIMULATE DATABASE FAILURE (DETECT) ==="
 Write-Output "[$(Get-UtcTimestamp)] Stopping database container 'hotel-postgres'..."
@@ -23,10 +23,10 @@ docker stop hotel-postgres
 Write-Output "[$(Get-UtcTimestamp)] Database container stopped."
 
 Write-Output "`n[$(Get-UtcTimestamp)] Probing /health (Liveness) during database outage:"
-curl.exe -s -i http://localhost:8000/health
+curl.exe -s -k -i https://localhost/health
 
 Write-Output "`n[$(Get-UtcTimestamp)] Probing /ready (Readiness) during database outage:"
-curl.exe -s -i http://localhost:8000/ready
+curl.exe -s -k -i https://localhost/ready
 
 Write-Output "`n=== STAGE 3: INCIDENT DIAGNOSIS VIA STRUCTURED JSON LOGS (DIAGNOSE) ==="
 Write-Output "[$(Get-UtcTimestamp)] Fetching structured JSON error logs from hotel-app:"
@@ -44,14 +44,19 @@ Write-Output "[$(Get-UtcTimestamp)] Database container is HEALTHY."
 
 Write-Output "`n=== STAGE 5: POST-RECOVERY VERIFICATION (SELF-HEALED) ==="
 Write-Output "[$(Get-UtcTimestamp)] Probing /ready (Readiness):"
-curl.exe -s -i http://localhost:8000/ready
+curl.exe -s -k -i https://localhost/ready
 
 Write-Output "`n[$(Get-UtcTimestamp)] Probing /health (Liveness):"
-curl.exe -s -i http://localhost:8000/health
+curl.exe -s -k -i https://localhost/health
 
 Write-Output "`n[$(Get-UtcTimestamp)] Verification of end-to-end functionality post-recovery:"
-$testBooking = '{"customer_name": "Drill Recovery Guest", "room_id": 1, "check_in": "2026-12-20", "check_out": "2026-12-22"}' | curl.exe -s -X POST http://localhost:8000/reservations -H "Content-Type: application/json" -d "@-"
-Write-Output $testBooking
+$in = (Get-Date).AddDays(30).ToString("yyyy-MM-dd")
+$out = (Get-Date).AddDays(35).ToString("yyyy-MM-dd")
+$testBooking = @"
+{"customer_name": "Drill Recovery Guest", "room_id": 1, "check_in": "$in", "check_out": "$out"}
+"@
+$bookingRes = $testBooking | curl.exe -s -k -i -X POST https://localhost/reservations -H "Content-Type: application/json" -d "@-"
+Write-Output $bookingRes
 
 Write-Output "`n============================================================"
 Write-Output "DRILL TIMELINE COMPLETE: $(Get-UtcTimestamp)"

@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $cloneDir = "D:\temp_clean_clone_verify"
-$evidenceFile = Join-Path $projectRoot "evidence\12_clean_clone.txt"
+$evidenceFile = Join-Path $projectRoot "evidence\13_clean_clone.txt"
 
 Write-Output "============================================================"
 Write-Output "ACCEPTANCE TEST 2: CLEAN-CLONE ENVIRONMENT & BOOKING DRILL"

@@ -1,0 +1,102 @@
+============================================================
+ACCEPTANCE TEST 2: CLEAN-CLONE ENVIRONMENT & BOOKING DRILL
+============================================================
+Execution Timestamp: 2026-11-16T01:47:22.678Z
+
+=== 1. STOPPING MAIN STACK ===
+=== 2. PREPARING ISOLATED CLONE DIRECTORY ===
+=== 3. GIT CLONE FROM REMOTE REPOSITORY ===
+
+=== 4. EXECUTING DOCUMENTED SETUP STEPS ===
+Step 4.1: Copy .env.example to .env
+Step 4.2: Generate local TLS certificates
+[CERT] Generating self-signed TLS certificate using C:\Program Files\Git\usr\bin\openssl.exe...
+[CERT SUCCESS] Self-signed certificate created:
+  Certificate: D:\temp_clean_clone_verify\certs\selfsigned.crt
+  Private Key: D:\temp_clean_clone_verify\certs\selfsigned.key
+Step 4.3: Start service stack with Docker Compose
+Waiting for containers to report healthy...
+App container health status: "healthy"
+
+=== 5. VERIFYING SERVICE STATUS ===
+NAME             IMAGE                         COMMAND                  SERVICE   CREATED          STATUS                    PORTS
+hotel-app        hotel-reservation-api:local   "sh -c 'alembic upgrΓÇª"   app       26 seconds ago   Up 13 seconds (healthy)   127.0.0.1:8000->8000/tcp
+hotel-nginx      nginx:alpine                  "/docker-entrypoint.ΓÇª"   nginx     26 seconds ago   Up 3 seconds              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+hotel-postgres   postgres:17-alpine            "docker-entrypoint.sΓÇª"   db        26 seconds ago   Up 24 seconds (healthy)   127.0.0.1:5432->5432/tcp
+
+=== 6. PROBING HEALTH & READINESS ENDPOINTS OVER HTTPS ===
+Testing /health (Liveness):
+HTTP/1.1 200 OK
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:17:59 GMT
+Content-Type: application/json
+Content-Length: 54
+Connection: keep-alive
+x-request-id: 99a42342-0359-4db9-a998-501ba985b418
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: no-referrer-when-downgrade
+
+{"status":"healthy","service":"hotel-reservation-api"}
+Testing /ready (Readiness):
+HTTP/1.1 200 OK
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:17:59 GMT
+Content-Type: application/json
+Content-Length: 41
+Connection: keep-alive
+x-request-id: a76c7356-c15a-4394-89aa-9b29e725fbaa
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: no-referrer-when-downgrade
+
+{"status":"ready","database":"connected"}
+=== 7. SEEDING DATABASE ===
+[SEED] Starting idempotent database seed...
+[SEED] Created room 101 (ID: 1).
+[SEED] Created room 102 (ID: 2).
+[SEED] Created room 201 (ID: 3).
+[SEED] Created room 202 (ID: 4).
+[SEED] Created baseline reservation BK001 for Room 101 (2026-11-25 to 2026-11-30).
+[SEED] Seeding completed successfully.
+
+=== 8. EXECUTING HTTPS BOOKING WITH DYNAMIC RELATIVE DATES ===
+Selected Dates: Check-in=2026-12-06, Check-out=2026-12-11
+Submitting initial reservation (Expect HTTP 201 Created):
+HTTP/1.1 201 Created
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:18:02 GMT
+Content-Type: application/json
+Content-Length: 160
+Connection: keep-alive
+x-request-id: e6581950-770e-4ca5-bc23-5408d01ae3fa
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: no-referrer-when-downgrade
+
+{"id":2,"booking_reference":"BK-DBFDBE15","customer_name":"Clean Clone Guest","room_id":1,"check_in":"2026-12-06","check_out":"2026-12-11","status":"confirmed"}
+=== 9. SUBMITTING CONFLICTING RESERVATION OVER HTTPS ===
+Submitting identical dates on Room 1 (Expect HTTP 409 Conflict):
+HTTP/1.1 409 Conflict
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:18:02 GMT
+Content-Type: application/json
+Content-Length: 59
+Connection: keep-alive
+x-request-id: 570d95fc-b9b8-41e6-8f55-635f9fc4e578
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: no-referrer-when-downgrade
+
+{"detail":"Room is already booked for the requested dates"}
+=== 10. TEARING DOWN CLEAN-CLONE STACK ===
+=== 11. RESTARTING MAIN ASSIGNMENT STACK ===
+=== CLEAN-CLONE DRILL COMPLETE ===

@@ -184,7 +184,7 @@ powershell -ExecutionPolicy Bypass -File scripts/demo_backup_restore.ps1
 
 ---
 
-## 9. Release Deployment & Instant Rollback
+## 9. Release Deployment & Fast Rollback
 
 Releases are containerized and version-tagged. Deployment and rollback do not require modifying code or configuration files.
 
@@ -199,7 +199,7 @@ docker compose ps app
 curl.exe -k -i https://localhost/health
 ```
 
-### Instant Rollback Procedure
+### Rollback Procedure
 If a regression or fault is detected in a new release:
 ```powershell
 # Revert APP_VERSION to the previous known good tag
@@ -209,9 +209,10 @@ docker compose up -d app
 # Verify immediate recovery
 curl.exe -k -i https://localhost/health
 ```
+Rollback executes as a fast rollback with a brief interruption (container recreation takes ~2-3 seconds).
 
 ### Automated Rollback Drill
-Run the verified rollback drill to validate zero-downtime regression rollback:
+Run the verified rollback drill to validate fast rollback with a brief interruption:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/rollback_drill.ps1
 ```

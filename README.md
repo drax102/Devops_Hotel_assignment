@@ -2,9 +2,9 @@
 
 [![CI Pipeline](https://github.com/drax102/Devops_Hotel_assignment/actions/workflows/ci.yml/badge.svg)](https://github.com/drax102/Devops_Hotel_assignment/actions/workflows/ci.yml)
 
-A production-grade, containerized Room Availability and Reservation Service built for the **ALGIONS AI LABS DevOps & Cloud Engineering** assessment.
+A containerized Room Availability and Reservation Service built for the **ALGIONS AI LABS DevOps & Cloud Engineering** assessment.
 
-This project delivers high concurrency resilience, automated continuous integration, strict container security, TLS-encrypted ingress with Nginx, structured observability, and zero-downtime disaster recovery.
+This project delivers high concurrency resilience, automated continuous integration, container security, TLS-encrypted ingress with Nginx, structured observability, and fast disaster recovery.
 
 ---
 
@@ -19,6 +19,8 @@ flowchart TD
     subgraph HostPorts ["Host Published Ports"]
         P80["Port 80 (HTTP)"]
         P443["Port 443 (HTTPS)"]
+        P8000["127.0.0.1:8000 (Dev Override)"]
+        P5432["127.0.0.1:5432 (Dev Override)"]
     end
 
     subgraph DockerBridge ["Docker Private Network: hotel_internal"]
@@ -53,6 +55,8 @@ flowchart TD
     P443 --> TLS
     TLS --> SecHeaders
     SecHeaders -->|Reverse Proxy: http://app:8000| AppUser
+    P8000 -.->|Direct Dev Access| AppUser
+    P5432 -.->|Direct Host Migrations| PGCore
     AppUser --> Middle
     Middle --> Routes
     Middle --> Liveness
@@ -152,8 +156,13 @@ docker compose exec app python scripts/seed.py
 ```
 
 ### 6. Create a Reservation over HTTPS
+Dates are defined dynamically relative to today:
 ```powershell
-$body = '{"room_id":1,"customer_name":"John Doe","check_in":"2026-12-01","check_out":"2026-12-05"}'
+$in = (Get-Date).AddDays(20).ToString("yyyy-MM-dd")
+$out = (Get-Date).AddDays(25).ToString("yyyy-MM-dd")
+$body = @"
+{"room_id":1,"customer_name":"John Doe","check_in":"$in","check_out":"$out"}
+"@
 $body | curl.exe -s -k -i -X POST https://localhost/reservations -H "Content-Type: application/json" -d "@-"
 ```
 
@@ -175,14 +184,19 @@ $body | curl.exe -s -k -i -X POST https://localhost/reservations -H "Content-Typ
 
 ---
 
-## Port Map
+## Port Map & Compose Configuration
 
-| Service | Internal Port | Published Port | Description | Access Policy |
-| :--- | :--- | :--- | :--- | :--- |
-| `hotel-nginx` | `80/tcp` | `80/tcp` | HTTP Redirect (301 -> HTTPS) | Public / Host |
-| `hotel-nginx` | `443/tcp` | `443/tcp` | HTTPS Reverse Proxy & TLS | Public / Host |
-| `hotel-app` | `8000/tcp` | None (prod) / `8000` (dev) | FastAPI HTTP REST API | Bridge only (Dev override `127.0.0.1:8000`) |
-| `hotel-postgres` | `5432/tcp` | None (prod) / `5432` (dev) | PostgreSQL Database | Bridge only (Dev override `127.0.0.1:5432`) |
+When running default `docker compose up -d`, Docker Compose automatically merges `docker-compose.yml` and `docker-compose.override.yml`. The active port bindings produced by `docker compose config` are:
+
+| Service | Container Port | Published Host Port | Interface Binding | Purpose | Source File |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `hotel-nginx` | `80/tcp` | `80` | `0.0.0.0` (all interfaces) | HTTP redirect (301 -> HTTPS) | `docker-compose.yml` |
+| `hotel-nginx` | `443/tcp` | `443` | `0.0.0.0` (all interfaces) | HTTPS reverse proxy & TLS | `docker-compose.yml` |
+| `hotel-app` | `8000/tcp` | `8000` | `127.0.0.1` (localhost only) | FastAPI direct access for local dev/testing | `docker-compose.override.yml` |
+| `hotel-postgres` | `5432/tcp` | `5432` | `127.0.0.1` (localhost only) | PostgreSQL host access for migrations/tests | `docker-compose.override.yml` |
+
+> [!NOTE]
+> `docker-compose.override.yml` is used for local developer ergonomics. In a production environment where the override file is omitted (`docker compose -f docker-compose.yml up -d`), `hotel-app` and `hotel-postgres` publish zero ports to the host and communicate exclusively over the private bridge network `hotel_internal`.
 
 ---
 
@@ -206,14 +220,17 @@ $body | curl.exe -s -k -i -X POST https://localhost/reservations -H "Content-Typ
 
 The GitHub Actions CI pipeline runs on every push and pull request to `main`:
 - **Linting & Code Quality**: `ruff check .` and `black --check .`
-- **Database Migrations & Test Suite**: PostgreSQL 17 service container, `alembic upgrade head`, and `pytest -v -s` with 100% passing tests including 10-thread parallel race-condition verification.
-- **Docker Build & Push**: On release tags (`v*`), builds multi-platform image and pushes signed, versioned image to GitHub Container Registry (GHCR).
+- **Database Migrations & Test Suite**: PostgreSQL 17 service container, `alembic upgrade head`, and `pytest -v -s` with passing tests including 10-thread parallel race-condition verification.
+- **Docker Build & Push**: On release tags (`v*`), builds multi-platform image and pushes versioned image to GitHub Container Registry (GHCR).
 
-### Real GHCR Published Release
+### Real GHCR Published Releases
 - **Repository**: `ghcr.io/drax102/devops_hotel_assignment`
-- **Release Tag**: `1.0.0`
-- **Index Digest**: `sha256:9fc1f38d9fdd9beaf19a310253f2d9ff50c2277369791fe4acff293f6fe38f14`
-- **Verified Run**: [Workflow Run 43717288264](https://github.com/drax102/Devops_Hotel_assignment/actions/runs/43717288264)
+- **Release Tag v1.0.0**: [Workflow Run 43717288264](https://github.com/drax102/Devops_Hotel_assignment/actions/runs/43717288264)
+  - Index Digest: `sha256:9fc1f38d9fdd9beaf19a310253f2d9ff50c2277369791fe4acff293f6fe38f14`
+  - Linux AMD64 Manifest: `sha256:0040a3901bc53a6194d1561134bd5f4cd881efed3b9dacb8fd7a9fd70c28603c`
+
+> [!IMPORTANT]
+> GHCR image `v1.0.0` was built from commit `012b738`, before `/ready`, JSON logging, and Nginx were introduced; the rollback drill used locally built tags (`hotel-reservation-api:v1.0.0` and `v1.0.1`). Release `v1.1.0` contains the complete production stack including `/ready`, JSON logging, and Nginx integration.
 
 ---
 
@@ -234,7 +251,7 @@ The GitHub Actions CI pipeline runs on every push and pull request to `main`:
   powershell -ExecutionPolicy Bypass -File scripts/demo_backup_restore.ps1
   ```
 
-### Release Deployment & Instant Rollback
+### Release Deployment & Fast Rollback
 - **Deploy specific release**:
   ```powershell
   $env:APP_VERSION = "v1.0.0"; docker compose up -d app
@@ -243,6 +260,7 @@ The GitHub Actions CI pipeline runs on every push and pull request to `main`:
   ```powershell
   $env:APP_VERSION = "v1.0.0"; docker compose up -d app
   ```
+  Rollback executes as a fast rollback with a brief interruption (container recreation takes ~2-3 seconds).
 - **Automated Verification**:
   ```powershell
   powershell -ExecutionPolicy Bypass -File scripts/rollback_drill.ps1
@@ -269,8 +287,9 @@ All evidence files contain raw, unedited terminal outputs captured on the system
 | **07** | [`evidence/07_image_digest.txt`](file:///evidence/07_image_digest.txt) | `v1.0.0` GHCR build, remote digest inspection, pull by digest & test |
 | **08** | [`evidence/08_observability_failure_drill.txt`](file:///evidence/08_observability_failure_drill.txt) | Outage drill: DB failure detected, readiness 503, JSON logs, self-healing |
 | **09** | [`evidence/09_backup_restore.txt`](file:///evidence/09_backup_restore.txt) | Database backup, data wipe, full restoration, and volume persistence drill |
-| **10** | [`evidence/10_rollback_drill.txt`](file:///evidence/10_rollback_drill.txt) | Deployment regression drill: buggy v1.0.1 deployed and rolled back to v1.0.0 |
+| **10** | [`evidence/10_rollback_drill.txt`](file:///evidence/10_rollback_drill.txt) | Deployment regression drill: fast rollback with a brief interruption to v1.0.0 |
 | **11** | [`evidence/11_nginx_https.txt`](file:///evidence/11_nginx_https.txt) | Nginx TLS termination, port 80 redirect, security headers, HTTPS booking |
+| **12** | [`evidence/12_clean_clone.txt`](file:///evidence/12_clean_clone.txt) | Clean clone into new folder, README steps, dynamic booking (201) & duplicate (409) |
 
 See [`evidence/INDEX.md`](file:///evidence/INDEX.md) for full descriptions.
 

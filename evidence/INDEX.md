@@ -4,21 +4,18 @@ This document indexes all verification outputs, test runs, CI logs, and operatio
 
 ---
 
-## Acceptance Test & Rubric Verification Map
+## Acceptance Test Verification Map
 
 | Step / Requirement | Evidence File | Command Executed | Status |
 | :--- | :--- | :--- | :--- |
-| **1. Baseline & Hygiene** | [`evidence/01_baseline_audit.txt`](file:///evidence/01_baseline_audit.txt) | Environment audit, Python 3.13.5, Windows 11, dependency checks | **VERIFIED** |
-| **2. Alembic Migrations** | [`evidence/02_alembic_migration.txt`](file:///evidence/02_alembic_migration.txt) | `alembic upgrade head`, `pg_constraint` GiST exclusion query | **VERIFIED** |
-| **3. Idempotent Seed** | [`evidence/03_seed_verification.txt`](file:///evidence/03_seed_verification.txt) | `python scripts/seed.py` (run twice consecutively, zero duplicates) | **VERIFIED** |
-| **4. Test Suite & Concurrency** | [`evidence/04_pytest_full.txt`](file:///evidence/04_pytest_full.txt) | `pytest -v -s` (10 concurrent requests: 1x 201 Created, 9x 409 Conflict) | **VERIFIED** |
-| **5. Docker Build & Compose** | [`evidence/05_docker_build_compose.txt`](file:///evidence/05_docker_build_compose.txt) | Multi-stage build (322MB, non-root `appuser:10001`), Compose up, `/health` 200 | **VERIFIED** |
-| **6. CI Pipeline Verification** | [`evidence/06_ci_pipeline.txt`](file:///evidence/06_ci_pipeline.txt) | GitHub API extraction of runs `43716465249` (PR) & `43716727141` (main) | **VERIFIED** |
-| **7. Versioned GHCR Digest** | [`evidence/07_image_digest.txt`](file:///evidence/07_image_digest.txt) | `v1.0.0` release workflow `43717288264`, `imagetools inspect`, digest pull | **VERIFIED** |
-| **8. Observability & Outage Drill** | [`evidence/08_observability_failure_drill.txt`](file:///evidence/08_observability_failure_drill.txt) | DB stopped: `/health` 200, `/ready` 503, JSON logs + `x-request-id`, self-healing | **VERIFIED** |
-| **9. Backup, Restore & Persistence** | [`evidence/09_backup_restore.txt`](file:///evidence/09_backup_restore.txt) | `backup.ps1` (-Fc dump), table wipe, `restore.ps1`, volume persistence drill | **VERIFIED** |
-| **10. Versioned Rollback Drill** | [`evidence/10_rollback_drill.txt`](file:///evidence/10_rollback_drill.txt) | v1.0.0 deployed -> v1.0.1 HTTP 500 regression -> rolled back to v1.0.0 | **VERIFIED** |
-| **11. Nginx Reverse Proxy & TLS** | [`evidence/11_nginx_https.txt`](file:///evidence/11_nginx_https.txt) | Port 80->443 redirect, TLS termination, security headers, HTTPS booking & 409 | **VERIFIED** |
+| **1. Baseline & Concurrency Protection** | [`evidence/04_pytest_full.txt`](file:///evidence/04_pytest_full.txt) | `pytest -v -s` (10 concurrent requests: 1x 201 Created, 9x 409 Conflict) | **VERIFIED** |
+| **2. Clean-Clone Environment & Start** | [`evidence/12_clean_clone.txt`](file:///evidence/12_clean_clone.txt) | Clean clone into new folder, README steps, dynamic booking (201) & duplicate (409) | **VERIFIED** |
+| **3. CI Pipeline Run** | [`evidence/06_ci_pipeline.txt`](file:///evidence/06_ci_pipeline.txt) | GitHub API extraction of runs `43716465249` (PR) & `43716727141` (main) | **VERIFIED** |
+| **4. Versioned Image Produced** | [`evidence/07_image_digest.txt`](file:///evidence/07_image_digest.txt) | Release tag `v1.0.0` workflow `43717288264`, `imagetools inspect`, digest pull | **VERIFIED** |
+| **5. Health Checks & JSON Logs** | [`evidence/08_observability_failure_drill.txt`](file:///evidence/08_observability_failure_drill.txt) | Decoupled `/health` & `/ready`, structured JSON logs with `x-request-id` | **VERIFIED** |
+| **6. Failure Detection & Recovery** | [`evidence/08_observability_failure_drill.txt`](file:///evidence/08_observability_failure_drill.txt) | DB stopped: `/ready` returns 503, error logged. DB started: self-heals to 200 | **VERIFIED** |
+| **7. Backup, Restore & Rollback** | [`evidence/09_backup_restore.txt`](file:///evidence/09_backup_restore.txt)<br>[`evidence/10_rollback_drill.txt`](file:///evidence/10_rollback_drill.txt) | `backup.ps1` (-Fc), table truncate, `restore.ps1`, volume persistence.<br>Fast rollback with a brief interruption from buggy v1.0.1 to v1.0.0 | **VERIFIED** |
+| **Ingress & TLS Verification** | [`evidence/11_nginx_https.txt`](file:///evidence/11_nginx_https.txt) | Port 80->443 redirect, TLS termination, security headers, HTTPS booking & 409 | **VERIFIED** |
 
 ---
 
@@ -76,7 +73,7 @@ This document indexes all verification outputs, test runs, CI logs, and operatio
 - Release deployment and rollback verification executed by `scripts/rollback_drill.ps1`.
 - Stable `hotel-reservation-api:v1.0.0` deployed via `APP_VERSION=v1.0.0` returning 200 OK.
 - Buggy `hotel-reservation-api:v1.0.1` with simulated HTTP 500 regression deployed; health check fails with HTTP 500.
-- Immediate zero-downtime rollback executed via `APP_VERSION=v1.0.0 docker compose up -d app`.
+- Fast rollback with a brief interruption executed via `APP_VERSION=v1.0.0 docker compose up -d app`.
 - Verified immediate recovery to HTTP 200 OK; source code clean and untouched.
 
 ### 11. `evidence/11_nginx_https.txt`
@@ -86,3 +83,13 @@ This document indexes all verification outputs, test runs, CI logs, and operatio
 - Verifies HTTP port 80 returns `301 Moved Permanently` redirecting to `https://localhost/health`.
 - Verifies HTTPS port 443 returns `200 OK` on `/health` and `/ready` with security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`, `Referrer-Policy`).
 - Verifies successful room booking over HTTPS (`201 Created`) and subsequent double-booking rejection (`409 Conflict`).
+
+### 12. `evidence/12_clean_clone.txt`
+- Clean-clone environment and startup verification executed by `scripts/verify_clean_clone.ps1`.
+- Cloned repository into fresh isolated directory (`D:\temp_clean_clone_verify`).
+- Followed ONLY the documented README commands: `.env.example` -> `.env`, `generate_certs.ps1`, `docker compose up -d`.
+- Verified `/health` and `/ready` return 200 OK over HTTPS.
+- Executed `scripts/seed.py` successfully.
+- Submitted HTTPS reservation using dynamic dates relative to today (`Check-in: today+20 days, Check-out: today+25 days`), returning `201 Created` with booking reference `BK-DBFDBE15`.
+- Submitted conflicting reservation for identical room and dates, returning `409 Conflict` (`Room is already booked for the requested dates`).
+- Verified complete teardown and clean restart of the primary stack.

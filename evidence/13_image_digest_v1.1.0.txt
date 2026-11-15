@@ -1,0 +1,45 @@
+============================================================
+GHCR CONTAINER IMAGE DIGEST & RUNTIME VERIFICATION (v1.1.0)
+============================================================
+Workflow Run URL: https://github.com/drax102/Devops_Hotel_assignment/actions/runs/43757515988
+Workflow Run ID: 43757515988
+Release Tag: v1.1.0 (Image Tag: 1.1.0)
+Target Repository: ghcr.io/drax102/devops_hotel_assignment
+
+=== 1. BUILDX IMAGETOOLS INSPECT (REMOTE GHCR REGISTRY) ===
+Name:      ghcr.io/drax102/devops_hotel_assignment:1.1.0
+MediaType: application/vnd.oci.image.index.v1+json
+Digest:    sha256:c04f01272af8741827b6e4d13109ac9dc0f52db2e5d86d6807f072ac5354bac8
+           
+Manifests: 
+  Name:        ghcr.io/drax102/devops_hotel_assignment:1.1.0@sha256:da8cdab147170c264d06a41e1cd5cb0119af66c5b400207a3965c0f25193ddfc
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    linux/amd64
+               
+  Name:        ghcr.io/drax102/devops_hotel_assignment:1.1.0@sha256:5d8f79ab1300daeff04b280554ade4e44a70c34561c822fd69943199c889c695
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    unknown/unknown
+  Annotations: 
+    vnd.docker.reference.digest: sha256:da8cdab147170c264d06a41e1cd5cb0119af66c5b400207a3965c0f25193ddfc
+    vnd.docker.reference.type:   attestation-manifest
+
+=== 2. LOCAL DOCKER PULL BY TAG 1.1.0 ===
+1.1.0: Pulling from drax102/devops_hotel_assignment
+Digest: sha256:c04f01272af8741827b6e4d13109ac9dc0f52db2e5d86d6807f072ac5354bac8
+Status: Image is up to date for ghcr.io/drax102/devops_hotel_assignment:1.1.0
+ghcr.io/drax102/devops_hotel_assignment:1.1.0
+
+=== 3. RUNTIME VERIFICATION OF PULLED v1.1.0 IMAGE ===
+Launched container test-v110-probe (4ccd503a0972684defa4346c3586b965ac40ce8d3bb05709c23d82fe4b8bf571)
+Probing http://localhost:8003/health:
+HTTP/1.1 200 OK
+date: Sun, 15 Nov 2026 20:23:43 GMT
+server: uvicorn
+content-length: 54
+content-type: application/json
+x-request-id: db4616c4-99ea-433f-9f6b-19fa66594375
+
+{"status":"healthy","service":"hotel-reservation-api"}
+Container cleaned up.
+
+=== v1.1.0 VERIFICATION COMPLETE ===

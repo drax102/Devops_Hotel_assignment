@@ -225,9 +225,14 @@ The GitHub Actions CI pipeline runs on every push and pull request to `main`:
 
 ### Real GHCR Published Releases
 - **Repository**: `ghcr.io/drax102/devops_hotel_assignment`
+- **Release Tag v1.1.0 (Full Production Stack with Ingress & Observability)**: [Workflow Run 43757515988](https://github.com/drax102/Devops_Hotel_assignment/actions/runs/43757515988)
+  - Index Digest: `sha256:c04f01272af8741827b6e4d13109ac9dc0f52db2e5d86d6807f072ac5354bac8`
+  - Linux AMD64 Manifest: `sha256:da8cdab147170c264d06a41e1cd5cb0119af66c5b400207a3965c0f25193ddfc`
+  - Evidence: [`evidence/13_image_digest_v1.1.0.txt`](file:///evidence/13_image_digest_v1.1.0.txt)
 - **Release Tag v1.0.0**: [Workflow Run 43717288264](https://github.com/drax102/Devops_Hotel_assignment/actions/runs/43717288264)
   - Index Digest: `sha256:9fc1f38d9fdd9beaf19a310253f2d9ff50c2277369791fe4acff293f6fe38f14`
   - Linux AMD64 Manifest: `sha256:0040a3901bc53a6194d1561134bd5f4cd881efed3b9dacb8fd7a9fd70c28603c`
+  - Evidence: [`evidence/07_image_digest.txt`](file:///evidence/07_image_digest.txt)
 
 > [!IMPORTANT]
 > GHCR image `v1.0.0` was built from commit `012b738`, before `/ready`, JSON logging, and Nginx were introduced; the rollback drill used locally built tags (`hotel-reservation-api:v1.0.0` and `v1.0.1`). Release `v1.1.0` contains the complete production stack including `/ready`, JSON logging, and Nginx integration.
@@ -290,6 +295,7 @@ All evidence files contain raw, unedited terminal outputs captured on the system
 | **10** | [`evidence/10_rollback_drill.txt`](file:///evidence/10_rollback_drill.txt) | Deployment regression drill: fast rollback with a brief interruption to v1.0.0 |
 | **11** | [`evidence/11_nginx_https.txt`](file:///evidence/11_nginx_https.txt) | Nginx TLS termination, port 80 redirect, security headers, HTTPS booking |
 | **12** | [`evidence/12_clean_clone.txt`](file:///evidence/12_clean_clone.txt) | Clean clone into new folder, README steps, dynamic booking (201) & duplicate (409) |
+| **13** | [`evidence/13_image_digest_v1.1.0.txt`](file:///evidence/13_image_digest_v1.1.0.txt) | `v1.1.0` GHCR build, remote digest inspection, pull by tag 1.1.0 & runtime test |
 
 See [`evidence/INDEX.md`](file:///evidence/INDEX.md) for full descriptions.
 

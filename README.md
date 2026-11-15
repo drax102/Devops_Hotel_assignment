@@ -189,7 +189,7 @@ $body | curl.exe -s -k -i -X POST https://localhost/reservations -H "Content-Typ
 
 ## Port Map & Network Isolation
 
-By default, executing `docker compose up -d` uses strictly `docker-compose.yml`, which isolates application and database ports from the host network.
+By default, executing `docker compose up -d` uses strictly `docker-compose.yml`, which isolates application and database ports from the host network. A TEMPORARY public demo URL was served through a Cloudflare quick tunnel from my laptop (see [`evidence/15_public_tunnel.txt`](file:///evidence/15_public_tunnel.txt)).
 
 ### Default Production Port Mappings (`docker compose up -d`)
 
@@ -306,6 +306,7 @@ All evidence files contain raw, unedited terminal outputs captured on the system
 | **12** | [`evidence/12_port_isolation.txt`](file:///evidence/12_port_isolation.txt) | Port isolation check: default stack publishes only 80 and 443 |
 | **13** | [`evidence/13_clean_clone.txt`](file:///evidence/13_clean_clone.txt) | Clean clone into new folder, README steps, dynamic booking (201) & duplicate (409) |
 | **14** | [`evidence/14_image_digest_v1.1.0.txt`](file:///evidence/14_image_digest_v1.1.0.txt) | `v1.1.0` GHCR build, remote digest inspection, pull by tag 1.1.0 & runtime test |
+| **15** | [`evidence/15_public_tunnel.txt`](file:///evidence/15_public_tunnel.txt) | Temporary public demo URL served through Cloudflare quick tunnel (`/health` & `/ready`) |
 
 See [`evidence/INDEX.md`](file:///evidence/INDEX.md) for full descriptions.
 
@@ -317,3 +318,5 @@ See [`evidence/INDEX.md`](file:///evidence/INDEX.md) for full descriptions.
    - *Status*: Deliberately out of scope. Per assessment guidelines, single-node Docker Compose on local infrastructure with reproducible scripting is the mandated target architecture.
 2. **ACME / Let's Encrypt Automated Certificate Issuance**:
    - *Status*: Production environments with registered domain names would use Let's Encrypt / Certbot. For local self-contained evaluation, automated generation of an X.509 certificate with Subject Alternative Names (`DNS:localhost, IP:127.0.0.1`) is implemented and verified.
+3. **Public URL & Authentication**:
+   - *Status*: A temporary public demo URL was served through a Cloudflare quick tunnel from my laptop (see [`evidence/15_public_tunnel.txt`](file:///evidence/15_public_tunnel.txt)). Public URL is temporary and has no authentication; no permanent hosting.

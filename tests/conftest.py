@@ -25,6 +25,17 @@ def setup_test_database():
     Ensure hotel_test_db exists and is fully migrated using Alembic.
     Never uses create_all/drop_all.
     """
+    # Create test database if it doesn't already exist
+    admin_engine = create_engine(DATABASE_URL, isolation_level="AUTOCOMMIT")
+    with admin_engine.connect() as conn:
+        exists = conn.execute(
+            text("SELECT 1 FROM pg_database WHERE datname = :dbname"),
+            {"dbname": TEST_DB_NAME},
+        ).scalar()
+        if not exists:
+            conn.execute(text(f'CREATE DATABASE "{TEST_DB_NAME}"'))
+    admin_engine.dispose()
+
     # Run Alembic migrations against hotel_test_db
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option(

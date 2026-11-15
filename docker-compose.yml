@@ -25,8 +25,6 @@ services:
     image: hotel-reservation-api:${APP_VERSION:-local}
     container_name: hotel-app
     restart: unless-stopped
-    ports:
-      - "8000:8000"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-hotel_db}
       POSTGRES_USER: ${POSTGRES_USER:-hotel_user}
@@ -36,8 +34,30 @@ services:
       APP_PORT: 8000
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENVIRONMENT: ${ENVIRONMENT:-development}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     depends_on:
       db:
+        condition: service_healthy
+    networks:
+      - hotel_internal
+
+  nginx:
+    image: nginx:alpine
+    container_name: hotel-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      app:
         condition: service_healthy
     networks:
       - hotel_internal

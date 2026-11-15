@@ -8,9 +8,10 @@ This guide provides practical diagnosis and remediation steps for operators diag
 
 | Check | Command | Expected Healthy Output |
 | :--- | :--- | :--- |
-| **Container State** | `docker compose ps` | `hotel-app (healthy)`, `hotel-postgres (healthy)` |
-| **Liveness Probe** | `curl.exe -i http://localhost:8000/health` | `HTTP/1.1 200 OK` |
-| **Readiness Probe** | `curl.exe -i http://localhost:8000/ready` | `HTTP/1.1 200 OK` |
+| **Container State** | `docker compose ps` | `hotel-nginx (Up)`, `hotel-app (healthy)`, `hotel-postgres (healthy)` |
+| **Liveness Probe (HTTPS)** | `curl.exe -k -i https://localhost/health` | `HTTP/1.1 200 OK` |
+| **Readiness Probe (HTTPS)** | `curl.exe -k -i https://localhost/ready` | `HTTP/1.1 200 OK` |
+| **HTTP Redirect (Port 80)** | `curl.exe -i http://localhost/health` | `HTTP/1.1 301 Moved Permanently` |
 | **Structured Logs** | `docker compose logs --tail=50 app` | JSON lines with `"level": "INFO"` |
 | **PostgreSQL Socket** | `docker compose exec db pg_isready -U hotel_user -d hotel_db` | `accepting connections` |
 
@@ -53,11 +54,41 @@ The FastAPI application cannot communicate with the PostgreSQL instance via the 
 
 ---
 
-### 2. Application Container Unhealthy or Crash-Looping
+### 2. Nginx Ingress or TLS Errors
+
+#### Symptoms
+- `curl.exe -k https://localhost/health` returns `curl: (35) schannel: ...` or connection refused.
+- `docker compose ps` shows `hotel-nginx` in state `restarting` or exited.
+
+#### Diagnosis
+1. Inspect Nginx error logs:
+   ```powershell
+   docker compose logs nginx
+   ```
+2. Check if TLS certificates exist on host:
+   ```powershell
+   Test-Path certs\selfsigned.crt, certs\selfsigned.key
+   ```
+   If `$false`, the Nginx container cannot find the mounted certificates.
+
+#### Remediation
+1. Generate the certificate files:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts/generate_certs.ps1
+   ```
+2. Restart the Nginx container:
+   ```powershell
+   docker compose restart nginx
+   ```
+3. If ports 80 or 443 are in use on host by another web server (IIS, Apache), terminate or rebind the conflicting service.
+
+---
+
+### 3. Application Container Unhealthy or Crash-Looping
 
 #### Symptoms
 - `docker compose ps` indicates `hotel-app` is `unhealthy` or `restarting`.
-- `curl http://localhost:8000/health` returns connection refused.
+- Nginx returns `502 Bad Gateway`.
 
 #### Diagnosis
 1. Inspect the container startup log:
@@ -67,43 +98,16 @@ The FastAPI application cannot communicate with the PostgreSQL instance via the 
 2. Common causes:
    - **Database not yet ready**: Ensure `depends_on: condition: service_healthy` is present in `docker-compose.yml`.
    - **Alembic migration failed**: An unhandled schema discrepancy or syntax error in a migration file prevented startup.
-   - **Port conflict**: Another process is occupying the mapped port.
 
 #### Remediation
 - If migrations failed, inspect Alembic state:
   ```powershell
   docker compose run --rm app alembic current
   ```
-- If port 8000 is occupied on the host, identify and resolve the conflicting process (see Section 3).
-
----
-
-### 3. Port Conflicts on Host (8000 or 5432)
-
-#### Symptoms
-- `docker compose up` outputs:
-  `Error response from daemon: driver failed programming external connectivity on endpoint ... bind: address already in use`
-
-#### Diagnosis
-Find the process occupying the port on Windows:
-```powershell
-# For application port 8000
-Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Select-Object OwningProcess
-
-# For database port 5432
-Get-NetTCPConnection -LocalPort 5432 -ErrorAction SilentlyContinue | Select-Object OwningProcess
-```
-
-#### Remediation
-1. Identify the process name using its PID:
-   ```powershell
-   Get-Process -Id <PID>
-   ```
-2. Terminate the rogue host process:
-   ```powershell
-   Stop-Process -Id <PID> -Force
-   ```
-3. Alternatively, adjust `APP_PORT` in `.env` to an open port (e.g., `8080`).
+- Re-run migrations manually if necessary:
+  ```powershell
+  docker compose exec app alembic upgrade head
+  ```
 
 ---
 
@@ -112,7 +116,7 @@ Get-NetTCPConnection -LocalPort 5432 -ErrorAction SilentlyContinue | Select-Obje
 #### Symptoms
 - An API consumer receives `HTTP/1.1 409 Conflict` when submitting a reservation:
   ```json
-  {"detail": "Room 101 is not available for the selected dates"}
+  {"detail": "Room is already booked for the requested dates"}
   ```
 
 #### Explanation
@@ -159,7 +163,6 @@ PostgreSQL prevents dropping or cleaning tables if active transactions hold excl
 Every incoming HTTP request is assigned a unique UUID4 `X-Request-ID`. If an error occurs, search for the returned header in the application logs:
 
 ```powershell
-# In PowerShell:
 docker compose logs app | Select-String "<REQUEST_ID>"
 ```
 

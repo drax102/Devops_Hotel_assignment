@@ -18,6 +18,7 @@ This document indexes all verification outputs, test runs, CI logs, and operatio
 | **8. Observability & Outage Drill** | [`evidence/08_observability_failure_drill.txt`](file:///evidence/08_observability_failure_drill.txt) | DB stopped: `/health` 200, `/ready` 503, JSON logs + `x-request-id`, self-healing | **VERIFIED** |
 | **9. Backup, Restore & Persistence** | [`evidence/09_backup_restore.txt`](file:///evidence/09_backup_restore.txt) | `backup.ps1` (-Fc dump), table wipe, `restore.ps1`, volume persistence drill | **VERIFIED** |
 | **10. Versioned Rollback Drill** | [`evidence/10_rollback_drill.txt`](file:///evidence/10_rollback_drill.txt) | v1.0.0 deployed -> v1.0.1 HTTP 500 regression -> rolled back to v1.0.0 | **VERIFIED** |
+| **11. Nginx Reverse Proxy & TLS** | [`evidence/11_nginx_https.txt`](file:///evidence/11_nginx_https.txt) | Port 80->443 redirect, TLS termination, security headers, HTTPS booking & 409 | **VERIFIED** |
 
 ---
 
@@ -77,3 +78,11 @@ This document indexes all verification outputs, test runs, CI logs, and operatio
 - Buggy `hotel-reservation-api:v1.0.1` with simulated HTTP 500 regression deployed; health check fails with HTTP 500.
 - Immediate zero-downtime rollback executed via `APP_VERSION=v1.0.0 docker compose up -d app`.
 - Verified immediate recovery to HTTP 200 OK; source code clean and untouched.
+
+### 11. `evidence/11_nginx_https.txt`
+- Nginx TLS termination and reverse proxy verification executed by `scripts/verify_nginx_https.ps1`.
+- Verifies `hotel-nginx`, `hotel-app`, and `hotel-postgres` container states.
+- Inspects x509 certificate for CN=localhost with SANs `DNS:localhost, IP:127.0.0.1`.
+- Verifies HTTP port 80 returns `301 Moved Permanently` redirecting to `https://localhost/health`.
+- Verifies HTTPS port 443 returns `200 OK` on `/health` and `/ready` with security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security`, `Referrer-Policy`).
+- Verifies successful room booking over HTTPS (`201 Created`) and subsequent double-booking rejection (`409 Conflict`).

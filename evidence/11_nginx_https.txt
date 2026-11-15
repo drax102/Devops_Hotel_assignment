@@ -1,0 +1,114 @@
+============================================================
+BLOCK B / EVIDENCE 11: NGINX HTTPS REVERSE PROXY VERIFICATION
+============================================================
+Verification Date: 2026-11-16T01:38:10.837Z
+
+=== 1. DOCKER COMPOSE SERVICE STATUS ===
+NAME             IMAGE                         COMMAND                  SERVICE   CREATED              STATUS                        PORTS
+hotel-app        hotel-reservation-api:local   "sh -c 'alembic upgrΓÇª"   app       About a minute ago   Up About a minute (healthy)   127.0.0.1:8000->8000/tcp
+hotel-nginx      nginx:alpine                  "/docker-entrypoint.ΓÇª"   nginx     8 minutes ago        Up 53 seconds                 0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+hotel-postgres   postgres:17-alpine            "docker-entrypoint.sΓÇª"   db        7 hours ago          Up 14 minutes (healthy)       127.0.0.1:5432->5432/tcp
+
+=== 2. TLS CERTIFICATE INSPECTION ===
+
+        Issuer: CN=localhost
+            Not Before: Nov 15 20:06:07 2026 GMT
+            Not After : Nov 15 20:06:07 2027 GMT
+        Subject: CN=localhost
+                DNS:localhost, IP Address:127.0.0.1
+
+=== 3. HTTP (PORT 80) -> HTTPS (PORT 443) 301 REDIRECT ===
+HTTP/1.1 301 Moved Permanently
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:08:11 GMT
+Content-Type: text/html
+Content-Length: 169
+Connection: keep-alive
+Location: https://localhost/health
+
+<html>
+<head><title>301 Moved Permanently</title></head>
+<body>
+<center><h1>301 Moved Permanently</h1></center>
+<hr><center>nginx/1.31.8</center>
+</body>
+</html>
+
+=== 4. HTTPS (PORT 443) /health LIVENESS & SECURITY HEADERS ===
+HTTP/1.1 200 OK
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:08:11 GMT
+Content-Type: application/json
+Content-Length: 54
+Connection: keep-alive
+x-request-id: 23d27aeb-14e8-4db0-8c15-0ca3202e7c5a
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: no-referrer-when-downgrade
+
+{"status":"healthy","service":"hotel-reservation-api"}
+=== 5. HTTPS (PORT 443) /ready READINESS PROBE ===
+HTTP/1.1 200 OK
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:08:11 GMT
+Content-Type: application/json
+Content-Length: 41
+Connection: keep-alive
+x-request-id: 0059f782-18f4-404a-9815-971a29807ba4
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: no-referrer-when-downgrade
+
+{"status":"ready","database":"connected"}
+=== 6. HTTPS (PORT 443) GET /rooms ===
+HTTP/1.1 200 OK
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:08:11 GMT
+Content-Type: application/json
+Content-Length: 377
+Connection: keep-alive
+x-request-id: fb7ddb6d-9ad1-4f3c-add9-f120c54400a1
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: no-referrer-when-downgrade
+
+[{"id":1,"room_number":"302","room_type":"Executive Penthouse","price_per_night":350},{"id":2,"room_number":"101","room_type":"Deluxe","price_per_night":150},{"id":3,"room_number":"102","room_type":"Standard","price_per_night":100},{"id":4,"room_number":"201","room_type":"Suite","price_per_night":250},{"id":5,"room_number":"202","room_type":"Standard","price_per_night":100}]
+=== 7. HTTPS (PORT 443) POST /reservations (BOOKING OVER TLS) ===
+HTTP/1.1 201 Created
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:08:12 GMT
+Content-Type: application/json
+Content-Length: 159
+Connection: keep-alive
+x-request-id: 507572c4-89eb-47c1-bf09-39450bb58fb2
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: no-referrer-when-downgrade
+
+{"id":4,"booking_reference":"BK-88AA8D81","customer_name":"Alice HTTPS Test","room_id":2,"check_in":"2026-12-10","check_out":"2026-12-15","status":"confirmed"}
+=== 8. HTTPS (PORT 443) CONFLICT PROTECTION OVER TLS (EXPECT 409) ===
+HTTP/1.1 409 Conflict
+Server: nginx/1.31.8
+Date: Sun, 15 Nov 2026 20:08:12 GMT
+Content-Type: application/json
+Content-Length: 59
+Connection: keep-alive
+x-request-id: be094298-8e04-4ed8-96d6-98f16bc0a406
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: no-referrer-when-downgrade
+
+{"detail":"Room is already booked for the requested dates"}
+=== NGINX HTTPS VERIFICATION COMPLETE ===
+
+

@@ -7,30 +7,44 @@ This runbook provides step-by-step procedures for operators managing the Hotel A
 ## 1. Architecture & Component Topology
 
 ```
-                       [ Host / Client ]
-                              │
-                    HTTP Port 8000 (localhost)
-                              │
-                    ┌─────────▼─────────┐
-                    │     hotel-app     │
-                    │  FastAPI (Uvicorn) │
-                    │ (appuser:10001)   │
-                    └─────────┬─────────┘
-                              │
-               Docker Bridge: hotel_internal
-               (DNS: db, Port: 5432)
-                              │
-                    ┌─────────▼─────────┐
-                    │  hotel-postgres   │
-                    │  PostgreSQL 17    │
-                    │ (postgres_data)   │
-                    └───────────────────┘
+                       [ Host / Client / Browser ]
+                                    │
+               ┌────────────────────┴────────────────────┐
+               │                                         │
+       Port 80 (HTTP)                            Port 443 (HTTPS)
+               │                                         │
+               └────────────────────┬────────────────────┘
+                                    │
+                         ┌──────────▼──────────┐
+                         │     hotel-nginx     │
+                         │   (Nginx Alpine)    │
+                         │ (TLS / Sec Headers) │
+                         └──────────┬──────────┘
+                                    │
+                      Docker Bridge: hotel_internal
+                      (DNS: app, Port: 8000)
+                                    │
+                         ┌──────────▼──────────┐
+                         │      hotel-app      │
+                         │  FastAPI (Uvicorn)  │
+                         │  (appuser:10001)    │
+                         └──────────┬──────────┘
+                                    │
+                      Docker Bridge: hotel_internal
+                      (DNS: db, Port: 5432)
+                                    │
+                         ┌──────────▼──────────┐
+                         │   hotel-postgres    │
+                         │   PostgreSQL 17     │
+                         │  (postgres_data)    │
+                         └─────────────────────┘
 ```
 
+- **Ingress Gateway**: `hotel-nginx` terminates TLS on port 443, issues 301 redirects for unencrypted port 80 HTTP requests, and sets defensive security headers.
 - **Runtime User**: `hotel-app` runs strictly as non-root user `appuser:10001`.
 - **Database Engine**: PostgreSQL 17 on Alpine Linux.
 - **Data Persistence**: Named Docker volume `postgres_data`.
-- **Internal Network**: Isolated bridge `hotel_internal`. Host cannot reach PostgreSQL directly in production; port 5432 is exposed only via `docker-compose.override.yml` for local development.
+- **Internal Network**: Isolated bridge `hotel_internal`. Neither the database nor the application ports are exposed directly in production; ingress flows exclusively through Nginx.
 
 ---
 
@@ -38,7 +52,8 @@ This runbook provides step-by-step procedures for operators managing the Hotel A
 
 - **Docker Desktop** (WSL2 engine on Windows, or Docker Engine on Linux/macOS)
 - **PowerShell 5.1+** (on Windows) or standard Bash shell
-- **curl.exe** or `curl` for HTTP probing
+- **OpenSSL** (Git for Windows OpenSSL or containerized fallback)
+- **curl.exe** or `curl` for HTTP/HTTPS probing
 
 ---
 
@@ -49,14 +64,17 @@ This runbook provides step-by-step procedures for operators managing the Hotel A
 # 1. Create environment configuration if not already present
 Copy-Item .env.example .env
 
-# 2. Start services in detached mode
+# 2. Generate local TLS certificate
+powershell -ExecutionPolicy Bypass -File scripts/generate_certs.ps1
+
+# 3. Start services in detached mode
 docker compose up -d
 
-# 3. Check container health status
+# 4. Check container health status
 docker compose ps
 ```
 
-The database container automatically initializes. The FastAPI container awaits database readiness (`depends_on: condition: service_healthy`) and executes `alembic upgrade head` before starting the Uvicorn ASGI server.
+The database container automatically initializes. The FastAPI container awaits database readiness (`depends_on: condition: service_healthy`) and executes `alembic upgrade head` before starting the Uvicorn ASGI server. Nginx starts once FastAPI reports healthy.
 
 ---
 
@@ -65,8 +83,12 @@ The database container automatically initializes. The FastAPI container awaits d
 The service decouples process liveness from database readiness:
 
 ### Liveness Probe (`/health`)
-Probes whether the FastAPI application process and ASGI event loop are responsive.
+Probes whether the application process and ASGI event loop are responsive.
 ```powershell
+# Via Nginx HTTPS
+curl.exe -k -i https://localhost/health
+
+# Direct to container (via dev port)
 curl.exe -i http://localhost:8000/health
 ```
 - **Expected Status**: `HTTP/1.1 200 OK`
@@ -75,7 +97,8 @@ curl.exe -i http://localhost:8000/health
 ### Readiness Probe (`/ready`)
 Probes whether the application can successfully query the PostgreSQL database (`SELECT 1`). Configured with a 3-second fail-fast timeout.
 ```powershell
-curl.exe -i http://localhost:8000/ready
+# Via Nginx HTTPS
+curl.exe -k -i https://localhost/ready
 ```
 - **Expected Status**: `HTTP/1.1 200 OK` (when DB is up) or `HTTP/1.1 503 Service Unavailable` (when DB is unreachable).
 - **Response (Up)**: `{"status":"ready","database":"connected"}`
@@ -115,7 +138,23 @@ docker compose exec app python scripts/seed.py
 
 ---
 
-## 7. Backup & Recovery Operations
+## 7. TLS Certificate Management
+
+### Generating or Rotating Certificates
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/generate_certs.ps1
+docker compose restart nginx
+```
+
+### Verifying TLS & Nginx Ingress
+An automated verification script tests port 80 redirect, TLS cipher negotiation, security headers, and HTTPS booking:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/verify_nginx_https.ps1
+```
+
+---
+
+## 8. Backup & Recovery Operations
 
 ### Taking a Database Backup
 Backups are performed online using `pg_dump` with custom compressed archive format (`-Fc`), which preserves table constraints, triggers, and indices (including the GiST exclusion constraint).
@@ -145,7 +184,7 @@ powershell -ExecutionPolicy Bypass -File scripts/demo_backup_restore.ps1
 
 ---
 
-## 8. Release Deployment & Instant Rollback
+## 9. Release Deployment & Instant Rollback
 
 Releases are containerized and version-tagged. Deployment and rollback do not require modifying code or configuration files.
 
@@ -157,7 +196,7 @@ docker compose up -d app
 
 # Verify container is running new image and healthy
 docker compose ps app
-curl.exe -i http://localhost:8000/health
+curl.exe -k -i https://localhost/health
 ```
 
 ### Instant Rollback Procedure
@@ -168,7 +207,7 @@ $env:APP_VERSION = "v1.0.0"
 docker compose up -d app
 
 # Verify immediate recovery
-curl.exe -i http://localhost:8000/health
+curl.exe -k -i https://localhost/health
 ```
 
 ### Automated Rollback Drill
@@ -179,7 +218,7 @@ powershell -ExecutionPolicy Bypass -File scripts/rollback_drill.ps1
 
 ---
 
-## 9. Stopping and Teardown
+## 10. Stopping and Teardown
 
 ```powershell
 # Graceful stop (keeps containers and network intact)

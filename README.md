@@ -4,7 +4,7 @@
 
 A production-grade, containerized Room Availability and Reservation Service built for the **ALGIONS AI LABS DevOps & Cloud Engineering** assessment.
 
-This project delivers high concurrency resilience, automated continuous integration, strict container security, structured observability, and zero-downtime disaster recovery.
+This project delivers high concurrency resilience, automated continuous integration, strict container security, TLS-encrypted ingress with Nginx, structured observability, and zero-downtime disaster recovery.
 
 ---
 
@@ -14,13 +14,21 @@ The system runs as an isolated multi-container architecture orchestrated via Doc
 
 ```mermaid
 flowchart TD
-    Client(["Client / Host"])
-    
-    subgraph HostPorts ["Published Ports"]
-        P8000["127.0.0.1:8000"]
+    Client(["Client / Host Browser / cURL"])
+
+    subgraph HostPorts ["Host Published Ports"]
+        P80["Port 80 (HTTP)"]
+        P443["Port 443 (HTTPS)"]
     end
 
     subgraph DockerBridge ["Docker Private Network: hotel_internal"]
+        subgraph NginxProxy ["hotel-nginx (Nginx Alpine)"]
+            Redirect["HTTP Port 80 -> 301 Redirect to HTTPS"]
+            TLS["TLS Termination (Port 443)"]
+            SecHeaders["Security Headers (HSTS, X-Frame, nosniff)"]
+            CertMount["Mount: certs/selfsigned.crt, key"]
+        end
+
         subgraph AppContainer ["hotel-app (FastAPI / Uvicorn)"]
             AppUser["Non-Root: appuser (UID 10001)"]
             Middle["Logging & Correlation Middleware (X-Request-ID)"]
@@ -38,8 +46,13 @@ flowchart TD
         Vol[("Named Volume: postgres_data")]
     end
 
-    Client -->|HTTP:8000| P8000
-    P8000 --> AppUser
+    Client -->|HTTP :80| P80
+    Client -->|HTTPS :443| P443
+    P80 --> Redirect
+    Redirect -->|301 Redirect| Client
+    P443 --> TLS
+    TLS --> SecHeaders
+    SecHeaders -->|Reverse Proxy: http://app:8000| AppUser
     AppUser --> Middle
     Middle --> Routes
     Middle --> Liveness
@@ -64,19 +77,16 @@ erDiagram
         string room_number UK "Unique Room Number (e.g. 101)"
         string room_type "Single | Double | Suite"
         decimal price_per_night "Nightly Rate"
-        int capacity "Guest Capacity"
     }
 
     RESERVATION {
         int id PK "Serial Primary Key"
-        string reservation_code UK "Unique Code (e.g. BK001)"
+        string booking_reference UK "Unique Reference (e.g. BK-88AA8D81)"
         int room_id FK "References ROOM(id)"
-        string guest_name "Guest Full Name"
-        string guest_email "Guest Email Address"
+        string customer_name "Customer Full Name"
         date check_in "Inclusive Check-in Date"
         date check_out "Exclusive Check-out Date"
         string status "confirmed | cancelled"
-        timestamp created_at "UTC Timestamp"
     }
 
     ROOM ||--o{ RESERVATION : "has many"
@@ -109,31 +119,42 @@ cd Devops_Hotel_assignment
 Copy-Item .env.example .env
 ```
 
-### 2. Start Service Stack
+### 2. Generate Local TLS Certificates
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/generate_certs.ps1
+```
+Generates a self-signed TLS certificate (`certs/selfsigned.crt` and `certs/selfsigned.key`) valid for `localhost` and `127.0.0.1`.
+
+### 3. Start Service Stack
 ```powershell
 docker compose up -d
 ```
-Docker Compose builds the multi-stage image (if not pre-pulled), starts PostgreSQL, performs migrations (`alembic upgrade head`), and starts FastAPI as `appuser:10001`.
+Docker Compose launches:
+- `hotel-postgres`: Runs PostgreSQL 17 Alpine on internal bridge `hotel_internal`.
+- `hotel-app`: Automatically executes `alembic upgrade head` and starts FastAPI on port 8000 as `appuser:10001`.
+- `hotel-nginx`: Terminates TLS on port 443, enforces HTTPS redirection from port 80, injects security headers, and reverse proxies upstream to `hotel-app`.
 
-### 3. Verify Health
+### 4. Verify Health & TLS Termination
 ```powershell
-# Verify liveness (web process)
-curl.exe http://localhost:8000/health
+# 1. Test HTTP to HTTPS 301 redirect
+curl.exe -i http://localhost/health
 
-# Verify readiness (database connectivity)
-curl.exe http://localhost:8000/ready
+# 2. Test HTTPS liveness probe (200 OK)
+curl.exe -k -i https://localhost/health
+
+# 3. Test HTTPS readiness probe (verifies database connectivity)
+curl.exe -k -i https://localhost/ready
 ```
-Both return `200 OK`.
 
-### 4. Seed Database
+### 5. Seed Database
 ```powershell
 docker compose exec app python scripts/seed.py
 ```
 
-### 5. Create a Reservation
+### 6. Create a Reservation over HTTPS
 ```powershell
-$body = '{"room_id":1,"guest_name":"John Doe","guest_email":"john@example.com","check_in":"2026-12-01","check_out":"2026-12-05"}'
-$body | curl.exe -s -X POST http://localhost:8000/reservations -H "Content-Type: application/json" -d "@-"
+$body = '{"room_id":1,"customer_name":"John Doe","check_in":"2026-12-01","check_out":"2026-12-05"}'
+$body | curl.exe -s -k -i -X POST https://localhost/reservations -H "Content-Type: application/json" -d "@-"
 ```
 
 ---
@@ -158,8 +179,10 @@ $body | curl.exe -s -X POST http://localhost:8000/reservations -H "Content-Type:
 
 | Service | Internal Port | Published Port | Description | Access Policy |
 | :--- | :--- | :--- | :--- | :--- |
-| `hotel-app` | `8000/tcp` | `8000/tcp` | FastAPI HTTP REST API | Public / Host |
-| `hotel-postgres` | `5432/tcp` | None (prod) / `5432` (dev) | PostgreSQL Database | Internal bridge only (Dev override on `127.0.0.1`) |
+| `hotel-nginx` | `80/tcp` | `80/tcp` | HTTP Redirect (301 -> HTTPS) | Public / Host |
+| `hotel-nginx` | `443/tcp` | `443/tcp` | HTTPS Reverse Proxy & TLS | Public / Host |
+| `hotel-app` | `8000/tcp` | None (prod) / `8000` (dev) | FastAPI HTTP REST API | Bridge only (Dev override `127.0.0.1:8000`) |
+| `hotel-postgres` | `5432/tcp` | None (prod) / `5432` (dev) | PostgreSQL Database | Bridge only (Dev override `127.0.0.1:5432`) |
 
 ---
 
@@ -247,6 +270,7 @@ All evidence files contain raw, unedited terminal outputs captured on the system
 | **08** | [`evidence/08_observability_failure_drill.txt`](file:///evidence/08_observability_failure_drill.txt) | Outage drill: DB failure detected, readiness 503, JSON logs, self-healing |
 | **09** | [`evidence/09_backup_restore.txt`](file:///evidence/09_backup_restore.txt) | Database backup, data wipe, full restoration, and volume persistence drill |
 | **10** | [`evidence/10_rollback_drill.txt`](file:///evidence/10_rollback_drill.txt) | Deployment regression drill: buggy v1.0.1 deployed and rolled back to v1.0.0 |
+| **11** | [`evidence/11_nginx_https.txt`](file:///evidence/11_nginx_https.txt) | Nginx TLS termination, port 80 redirect, security headers, HTTPS booking |
 
 See [`evidence/INDEX.md`](file:///evidence/INDEX.md) for full descriptions.
 
@@ -254,7 +278,7 @@ See [`evidence/INDEX.md`](file:///evidence/INDEX.md) for full descriptions.
 
 ## Known Gaps & Current Scope
 
-1. **Nginx Reverse Proxy & HTTPS**:
-   - *Status*: In progress (scheduled for immediate execution in Block B). Configuration and self-signed certificate generation scripts are prepared locally.
-2. **Kubernetes / Cloud Clustering**:
+1. **Kubernetes / Cloud Multi-Node Clustering**:
    - *Status*: Deliberately out of scope. Per assessment guidelines, single-node Docker Compose on local infrastructure with reproducible scripting is the mandated target architecture.
+2. **ACME / Let's Encrypt Automated Certificate Issuance**:
+   - *Status*: Production environments with registered domain names would use Let's Encrypt / Certbot. For local self-contained evaluation, automated generation of an X.509 certificate with Subject Alternative Names (`DNS:localhost, IP:127.0.0.1`) is implemented and verified.

@@ -1,0 +1,6 @@
+# Local development overrides only
+# Publishes the PostgreSQL port to 127.0.0.1 for host-level pytest execution and tools
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"

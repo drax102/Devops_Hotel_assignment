@@ -1,0 +1,41 @@
+# Version control
+.git
+.gitignore
+
+# Virtual environment
+.venv
+venv
+ENV
+
+# Python artifacts
+__pycache__
+*.py[cod]
+*$py.class
+
+# Testing & quality caches
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Environment & credentials (CRITICAL)
+.env
+.env.*
+certs
+*.pem
+*.key
+*.crt
+
+# Backups & dumps
+backups
+*.dump
+
+# Project docs and evidence (not needed in runtime container)
+evidence
+docs
+
+# IDEs & OS
+.idea
+.vscode
+.DS_Store
+Thumbs.db
